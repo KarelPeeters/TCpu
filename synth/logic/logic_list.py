@@ -1,3 +1,4 @@
+from collections import Counter
 from dataclasses import dataclass
 from typing import List, Optional, Set
 
@@ -58,9 +59,13 @@ class LogicList:
         return signal
 
     def mark_external_input(self, *signal: Signal):
+        for s in signal:
+            assert isinstance(s, Signal), f"Expected Signal, got {type(s)}"
         self.external_inputs.update(signal)
 
-    def mark_external_output(self, *signal):
+    def mark_external_output(self, *signal: Signal):
+        for s in signal:
+            assert isinstance(s, Signal), f"Expected Signal, got {type(s)}"
         self.external_outputs.update(signal)
 
     def push_lut(self, lut: LUT):
@@ -118,6 +123,8 @@ class LogicList:
 
     def __str__(self):
         result = "LogicList(\n"
+
+        # signals
         result += "  signals: [\n"
         for signal in self.signals:
             result += f"    {signal}"
@@ -127,13 +134,25 @@ class LogicList:
                 result += " out"
             result += "\n"
         result += "  ],\n"
+
+        # luts and ffs
         result += "  luts: [\n"
         for lut in self.luts:
-            result += f"    {lut.output} = LUT({lut.inputs}, {lut.table})\n"
+            table_str = "".join("1" if x else "0" for x in lut.table)
+            result += f"    {lut.output} = LUT({lut.inputs}, {table_str})\n"
         result += "  ],\n"
         result += "  ffs: [\n"
         for ff in self.ffs:
             result += f"    {ff.output} = FF({ff.input}, {ff.init})\n"
         result += "  ],\n"
+
+        # counts
+        luts_per_input_count = Counter()
+        for lut in self.luts:
+            luts_per_input_count[len(lut.inputs)] += 1
+        result += f"  luts: {len(self.luts)},\n"
+        result += f"  ffs: {len(self.ffs)},\n"
+        result += f"  luts_per_input_count: {dict(luts_per_input_count)},"
+
         result += ")"
         return result
