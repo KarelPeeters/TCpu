@@ -21,6 +21,9 @@ class Signal:
             return f"Signal({self.id}, \"{self.debug_name}\")"
         return f"Signal({self.id})"
 
+    def __repr__(self):
+        return str(self)
+
 
 @dataclass
 class LUT:
@@ -54,11 +57,11 @@ class LogicList:
         self.signals.append(signal)
         return signal
 
-    def mark_external_input(self, signal: Signal):
-        self.external_inputs.add(signal)
+    def mark_external_input(self, *signal: Signal):
+        self.external_inputs.update(signal)
 
-    def mark_external_output(self, signal: Signal):
-        self.external_outputs.add(signal)
+    def mark_external_output(self, *signal):
+        self.external_outputs.update(signal)
 
     def push_lut(self, lut: LUT):
         self.luts.append(lut)
@@ -112,3 +115,25 @@ class LogicList:
             for signal in signals_all:
                 if signal not in signals_driven and signal not in signals_used:
                     print(f"Warning: signal {signal} is not connected to anything")
+
+    def __str__(self):
+        result = "LogicList(\n"
+        result += "  signals: [\n"
+        for signal in self.signals:
+            result += f"    {signal}"
+            if signal in self.external_inputs:
+                result += " in"
+            if signal in self.external_outputs:
+                result += " out"
+            result += "\n"
+        result += "  ],\n"
+        result += "  luts: [\n"
+        for lut in self.luts:
+            result += f"    {lut.output} = LUT({lut.inputs}, {lut.table})\n"
+        result += "  ],\n"
+        result += "  ffs: [\n"
+        for ff in self.ffs:
+            result += f"    {ff.output} = FF({ff.input}, {ff.init})\n"
+        result += "  ],\n"
+        result += ")"
+        return result
