@@ -1,5 +1,6 @@
 from abc import abstractmethod, ABC
 from collections import Counter
+from dataclasses import dataclass
 from typing import List, Optional, Dict
 
 
@@ -20,13 +21,20 @@ class Wire:
         return str(self)
 
 
+@dataclass
+class Port:
+    name: str
+    dir: Optional[str]
+    wire: Wire
+
+
 class Component(ABC):
     def __init__(self):
         self.debug_name = None
 
     @abstractmethod
-    def connected_wires(self) -> List[Wire]:
-        pass
+    def ports(self) -> List[Port]:
+        raise NotImplementedError()
 
 
 class NetList:
@@ -45,6 +53,10 @@ class NetList:
         self.vdd.full_name = "vdd"
         self.gnd = self.new_wire("gnd")
         self.gnd.full_name = "gnd"
+        self.clk = self.new_wire("clk")
+        self.clk.full_name = "clk"
+
+        self.global_wires = [self.vdd, self.gnd, self.clk]
 
     def new_wire(self, debug_name: Optional[str] = None) -> Wire:
         wire = Wire(len(self.wires), debug_name)
@@ -72,5 +84,53 @@ class NetList:
         for component_type, count in counts.items():
             print(f"    {component_type.__name__}: {count}")
         if component_cost is not None:
-            total_cost = sum(component_cost.get(component_type.__name__, 0) * count for component_type, count in counts.items())
+            total_cost = sum(
+                component_cost.get(component_type.__name__, 0) * count for component_type, count in counts.items())
             print(f"  Total cost: {total_cost}")
+
+    def render(self):
+        import graphviz
+        dot = graphviz.Digraph()
+        next_dummy_index = 0
+
+        # both wires and components are nodes
+        # TODO directly connect wires with only two blocks connected?
+        for wire in self.wires:
+            if wire in self.global_wires:
+                continue
+            dot.node(name=f"wire_{wire.id}", label=str(wire))
+
+        for component in self.components:
+            dot.node(name=f"component_{id(component)}", label=str(component), shape="box")
+            for port in component.ports():
+                wire = port.wire
+                if wire in self.global_wires:
+                    if wire == self.vdd:
+                        shape = "triangle"
+                        dir = "s"
+                    elif wire == self.gnd:
+                        shape = "invtriangle"
+                        dir = "n"
+                    elif wire == self.clk:
+                        shape = "square"
+                        dir = None
+                    else:
+                        shape = None
+                        dir = None
+
+                    label = str(wire) if shape is None else ""
+                    dot.node(name=f"dummy_{next_dummy_index}", label=label, shape=shape)
+                    next_dummy_index += 1
+                    head_name = f"dummy_{next_dummy_index - 1}"
+                else:
+                    head_name = f"wire_{wire.id}"
+                    dir = "none"
+
+                dot.edge(f"component_{id(component)}", head_name, tailport=port.dir, dir=dir, arrowhead="none")
+        print(dot)
+        # all_engines = ["dot", "neato", "fdp", "circo", "twopi", "osage", "patchwork"]
+        # for engine in all_engines:
+        #     dot.render(f"netlist_{engine}", view=True, format="svg", engine=engine)
+        # dot.render(f"netlist", view=False, format="svg", engine="neato")
+        # dot.render(f"netlist", view=False, format="svg", engine="fdp")
+        dot.render(f"netlist", view=False, format="svg", engine="fdp")

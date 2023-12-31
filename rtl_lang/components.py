@@ -1,6 +1,6 @@
 from typing import List
 
-from rtl_lang.core import Component, Wire
+from rtl_lang.core import Component, Wire, Port
 
 
 class Bridge(Component):
@@ -9,8 +9,8 @@ class Bridge(Component):
         self.a = a
         self.b = b
 
-    def connected_wires(self) -> List[Wire]:
-        return [self.a, self.b]
+    def ports(self) -> List[Port]:
+        return [Port("a", None, self.a), Port("b", None, self.b)]
 
     def __str__(self):
         return f"Bridge({self.a}, {self.b})"
@@ -21,8 +21,8 @@ class Resistor(Component):
         self.a = a
         self.b = b
 
-    def connected_wires(self) -> List[Wire]:
-        return [self.a, self.b]
+    def ports(self) -> List[Port]:
+        return [Port("a", None, self.a), Port("b", None, self.b)]
 
     def __str__(self):
         return f"Resistor({self.a}, {self.b})"
@@ -38,8 +38,8 @@ class Led(Component):
         self.high = high
         self.low = low
 
-    def connected_wires(self) -> List[Wire]:
-        return [self.high, self.low]
+    def ports(self) -> List[Port]:
+        return [Port("high", "n", self.high), Port("low", "s", self.low)]
 
     def __str__(self):
         return f"Led(high={self.high}, low={self.low})"
@@ -53,8 +53,8 @@ class NMOS(Component):
         self.up = up
         self.down = down
 
-    def connected_wires(self) -> List[Wire]:
-        return [self.gate, self.up, self.down]
+    def ports(self) -> List[Port]:
+        return [Port("gate", "w", self.gate), Port("up", "n", self.up), Port("down", "s", self.down)]
 
     def __str__(self):
         return f"NMOS(gate={self.gate}, up={self.up}, down={self.down})"
@@ -68,8 +68,8 @@ class PMOS(Component):
         self.up = up
         self.down = down
 
-    def connected_wires(self) -> List[Wire]:
-        return [self.gate, self.up, self.down]
+    def ports(self) -> List[Port]:
+        return [Port("gate", "w", self.gate), Port("up", "n", self.up), Port("down", "s", self.down)]
 
     def __str__(self):
         return f"PMOS(gate={self.gate}, up={self.up}, down={self.down})"

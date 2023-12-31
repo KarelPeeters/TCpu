@@ -12,14 +12,17 @@ def main():
     # r = gate_xor(net, a, b, c)
     # print(r)
 
-    r = gate_table(net, [0, 1], [a])
-    print(r)
+    for i in range(10):
+        r = gate_table(net, [0, 1], [a])
+        print(r)
 
     component_cost = {
         "NMos": 0.0062,
         "Resistor": 0.0005,
     }
     net.print(component_cost)
+
+    net.render()
 
 
 if __name__ == '__main__':
