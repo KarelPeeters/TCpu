@@ -67,7 +67,7 @@ class NetList:
         self.components.append(component)
 
     def connect(self, a: Wire, b: Wire):
-        from rtl_lang.components import Bridge
+        from synth.net.components import Bridge
         self.push_component(Bridge(a, b))
 
     def print(self, component_cost: Optional[Dict[str, float]] = None):

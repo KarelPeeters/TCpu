@@ -1,6 +1,6 @@
 from typing import List
 
-from rtl_lang.core import Component, Wire, Port
+from synth.net.net_list import Component, Wire, Port
 
 
 class Bridge(Component):
@@ -14,6 +14,7 @@ class Bridge(Component):
 
     def __str__(self):
         return f"Bridge({self.a}, {self.b})"
+
 
 class Resistor(Component):
     def __init__(self, a: Wire, b: Wire):
