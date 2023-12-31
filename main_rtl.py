@@ -1,4 +1,4 @@
-from synth.logic.builder import LogicBuilder
+from synth.logic.builder import LogicBuilder, Unsigned
 from synth.logic.logic_list import LogicList
 
 COMPONENT_COST = {
@@ -7,21 +7,18 @@ COMPONENT_COST = {
 }
 
 
+def counter(build: LogicBuilder, bits: int) -> Unsigned:
+    curr = build.new_unsigned(bits)
+    curr %= curr.delay(1).add_trunc(1)
+    return curr
+
+
 def main():
     logic = LogicList()
     build = LogicBuilder(logic)
 
-    a = build.new_unsigned(4, "a")
-    b = build.new_unsigned(4, "b")
-    logic.mark_external_input(*a.signals, *b.signals)
-
-    # r_and = a & b
-    # r_or = a | b
-    # logic.mark_external_output(*r_and.signals, *r_or.signals)
-
-    sum = a + b
-    print(sum.signals)
-    logic.mark_external_output(*sum.signals)
+    curr = counter(build, 4)
+    logic.mark_external_output(*curr.signals)
 
     logic.validate(warn_unused=True, warn_undriven=True, warn_unconnected=True)
     print(logic)

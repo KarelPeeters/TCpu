@@ -11,7 +11,7 @@ class LogicBuilder:
         self.logic = logic
 
     # construction
-    def new_const(self, value: bool) -> 'Bit':
+    def const_bit(self, value: bool) -> 'Bit':
         signal = self.logic.new_lut([], [value])
         return Bit(self, signal)
 
@@ -48,34 +48,75 @@ class LogicBuilder:
 @dataclass
 class BuilderValue(ABC):
     """
-    Wrapper around signals that allow for automatically building utility functions and operator overloading.
+    Monad containing signals, allowing for easily implementing utility functions and operator overloading.
     """
     builder: 'LogicBuilder'
 
     @abstractmethod
-    def map_signals(self, f: Callable[[Signal], Signal]) -> Self:
+    def map(self, other: Optional[Self], f: Callable[[Signal, Optional[Signal]], Signal]) -> Self:
+        raise NotImplementedError()
+
+    @abstractmethod
+    def type_name(self) -> str:
         raise NotImplementedError()
 
     def delay(self, n: int = 1) -> Self:
         """
         Delay a signal by n cycles by inserting n flip-flops.
         """
-        # TODO expose the initial value? how, it's not just a bool but another monad instance
-        return self.map_signals(lambda s: reduce(lambda x, _: self.builder.logic.new_ff(x, init=False), range(n), s))
+
+        # TODO expose the initial value?
+        #   how? it's not just a bool but a constant monad instance containing bool instead of Signal
+
+        def f(a, b):
+            assert b is None
+            return reduce(
+                lambda x, _: self.builder.logic.new_ff(x, init=False), range(n), a
+            )
+
+        return self.map(None, f)
+
+    def __imod__(self, other):
+        """
+        We use the imod operator to connect two (sets of) signals.
+        The following at the same:
+
+        connect(a, b)   # hypothetical
+        a %= b
+        b %= a
+        """
+
+        self_ty = self.type_name()
+        other_ty = other.type_name()
+        assert self_ty == other_ty, f"Connection type mismatch: {self_ty} vs {other_ty}"
+
+        def f(a, b):
+            self.builder.logic.connect(a, b)
+            # we have to return a dummy signal
+            return a
+
+        _ = self.map(other, f)
+        # we want the lhs to just stay the same
+        return self
 
 
 @dataclass
 class Bit(BuilderValue):
     signal: Signal
 
+    def __post_init__(self):
+        assert isinstance(self.signal, Signal), f"Expected Signal, got {type(self.signal)}"
+
     def __repr__(self):
         return f"Bit({self.signal})"
 
-    def map_signals(self, f: Callable[[Signal], Signal]) -> 'Bit':
-        return Bit(self.builder, f(self.signal))
+    def map(self, other: Optional[Self], f: Callable[[Signal, Optional[Signal]], Signal]) -> Self:
+        if other is not None:
+            assert isinstance(other, Bit), f"Type mismatch: expected Optional[Bit], got {type(other)}"
+        return Bit(self.builder, f(self.signal, other.signal if other is not None else None))
 
-    def __post_init__(self):
-        assert isinstance(self.signal, Signal), f"Expected Signal, got {type(self.signal)}"
+    def type_name(self) -> str:
+        return "bit"
 
     def __invert__(self) -> 'Bit':
         return Bit(self.builder, self.builder.gate_not(self.signal))
@@ -104,13 +145,26 @@ class BitVec(BuilderValue):
 
         return BitVec(builder, [b.signal for b in bits])
 
-    def __repr__(self):
-        return f"BitVec({self.signals})"
-
     def __post_init__(self):
         assert isinstance(self.signals, list), f"Expected list, got {type(self.signals)}"
         for s in self.signals:
             assert isinstance(s, Signal), f"Expected Signal, got {type(s)}"
+
+    def __repr__(self):
+        return f"BitVec({self.signals})"
+
+    def map(self, other: Optional[Self], f: Callable[[Signal, Optional[Signal]], Signal]) -> Self:
+        if other is not None:
+            assert isinstance(other, BitVec), f"Type mismatch: expected Optional[BitVec], got {type(other)}"
+            assert len(self) == len(other), f"Length mismatch: {len(self)} vs {len(other)}"
+
+        if other is None:
+            return BitVec(self.builder, [f(a, None) for a in self.signals])
+        else:
+            return BitVec(self.builder, [f(a, b) for a, b in zip(self.signals, other.signals)])
+
+    def type_name(self) -> str:
+        return f"bitvec[{len(self)}]"
 
     @staticmethod
     def empty(builder: LogicBuilder):
@@ -123,9 +177,6 @@ class BitVec(BuilderValue):
     @staticmethod
     def broadcast(bit: Bit, n: int):
         return BitVec(bit.builder, [bit.signal] * n)
-
-    def map_signals(self, f: Callable[[Signal], Signal]) -> Self:
-        return BitVec(self.builder, [f(s) for s in self.signals])
 
     def __len__(self):
         return len(self.signals)
@@ -175,11 +226,16 @@ class Unsigned(BuilderValue):
     def __repr__(self):
         return f"Unsigned({self.vec.signals})"
 
+    def map(self, other: Optional[Self], f: Callable[[Signal, Optional[Signal]], Signal]) -> Self:
+        assert other is None or isinstance(other, Unsigned), \
+            f"Type mismatch: expected Optional[Unsigned], got {type(other)}"
+        return Unsigned(self.builder, self.vec.map(other.vec if other is not None else None, f))
+
+    def type_name(self) -> str:
+        return f"unsigned[{len(self)}]"
+
     def as_vec(self) -> BitVec:
         return self.vec
-
-    def map_signals(self, f: Callable[[Signal], Signal]) -> Self:
-        return Unsigned(self.builder, self.vec.map_signals(f))
 
     @property
     def signals(self) -> List[Signal]:
@@ -203,11 +259,18 @@ class Unsigned(BuilderValue):
         assert self.builder is other.builder
         return Unsigned(self.builder, self.vec.__xor__(other.vec))
 
-    def add_full(self, other: Self, cin: Optional[Signal]) -> Self:
+    def add_full(self, other: Union[Self, int], cin: Optional[Signal]) -> Self:
+        if isinstance(other, int):
+            assert 0 <= other < 2 ** len(self)
+            bits = [self.builder.const_bit(other >> i != 0) for i in range(len(self))]
+            other = Unsigned(self.builder, BitVec.from_bits(self.builder, bits))
+
+        assert isinstance(other, Unsigned)
+        assert cin is None or isinstance(cin, Signal)
         assert self.builder is other.builder
         assert len(self) == len(other)
 
-        carry = cin if cin is not None else self.builder.new_const(False)
+        carry = cin if cin is not None else self.builder.const_bit(False)
         result = []
 
         for i in range(len(self)):
@@ -221,5 +284,9 @@ class Unsigned(BuilderValue):
         result.append(carry)
         return Unsigned(self.builder, BitVec.from_bits(self.builder, result))
 
-    def __add__(self, other: Self) -> Self:
+    def add_trunc(self, other: Union[Self, int], cin: Optional[Signal] = None) -> Self:
+        result = self.add_full(other, cin)
+        return result.as_vec()[:-1].as_unsigned()
+
+    def __add__(self, other: Union[Self, int]) -> Self:
         return self.add_full(other, cin=None)

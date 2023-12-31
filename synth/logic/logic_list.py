@@ -3,11 +3,17 @@ from dataclasses import dataclass
 from typing import List, Optional, Set
 
 
-@dataclass
 class Signal:
-    id: int
+    unique_id: int
     debug_name: Optional[str]
     full_name: Optional[str]
+    logic: 'LogicList'
+
+    def __init__(self, unique_id: int, debug_name: Optional[str], logic: 'LogicList'):
+        self.unique_id = unique_id
+        self.debug_name = debug_name
+        self.logic = logic
+        self.full_name = None
 
     def __hash__(self):
         return id(self)
@@ -19,8 +25,8 @@ class Signal:
         if self.full_name is not None:
             return f"\"{self.full_name}\""
         if self.debug_name is not None:
-            return f"Signal({self.id}, \"{self.debug_name}\")"
-        return f"Signal({self.id})"
+            return f"Signal({self.unique_id}, \"{self.debug_name}\")"
+        return f"Signal({self.unique_id})"
 
     def __repr__(self):
         return str(self)
@@ -49,26 +55,40 @@ class LogicList:
         self.signals: List[Signal] = []
         self.luts: List[LUT] = []
         self.ffs: List[FF] = []
+        self.connections: List[(Signal, Signal)] = []
 
         self.external_inputs: Set[Signal] = set()
         self.external_outputs: Set[Signal] = set()
 
+    def check_signal(self, signal: Signal):
+        assert isinstance(signal, Signal), f"Expected Signal, got {type(signal)}"
+        assert signal.logic is self
+
     def new_signal(self, debug_name: Optional[str] = None) -> Signal:
-        signal = Signal(id=len(self.signals), debug_name=debug_name, full_name=None)
+        signal = Signal(unique_id=len(self.signals), debug_name=debug_name, logic=self)
         self.signals.append(signal)
         return signal
 
+    def connect(self, a: Signal, b: Signal):
+        self.check_signal(a)
+        self.check_signal(b)
+        self.connections.append((a, b))
+
     def mark_external_input(self, *signal: Signal):
         for s in signal:
-            assert isinstance(s, Signal), f"Expected Signal, got {type(s)}"
+            self.check_signal(s)
         self.external_inputs.update(signal)
 
     def mark_external_output(self, *signal: Signal):
         for s in signal:
-            assert isinstance(s, Signal), f"Expected Signal, got {type(s)}"
+            self.check_signal(s)
         self.external_outputs.update(signal)
 
     def push_lut(self, lut: LUT):
+        for s in lut.inputs:
+            self.check_signal(s)
+        self.check_signal(lut.output)
+
         self.luts.append(lut)
 
     def new_lut(self, inputs: List[Signal], table: List[bool]) -> Signal:
@@ -78,6 +98,8 @@ class LogicList:
         return output
 
     def push_ff(self, ff: FF):
+        self.check_signal(ff.input)
+        self.check_signal(ff.output)
         self.ffs.append(ff)
 
     def new_ff(self, input: Signal, init: bool) -> Signal:
@@ -87,6 +109,8 @@ class LogicList:
         return output
 
     def validate(self, warn_unused=False, warn_undriven=False, warn_unconnected: bool = False):
+        # TODO support connections here
+
         signals_driven = set(self.external_inputs)
         signals_used = set(self.external_outputs)
         signals_all = set(self.signals)
@@ -105,8 +129,8 @@ class LogicList:
 
         indices_all = set()
         for signal in signals_all:
-            assert signal.id not in indices_all, f"Signal {signal} has duplicate ID {signal.id}"
-            indices_all.add(signal.id)
+            assert signal.unique_id not in indices_all, f"Signal {signal} has duplicate ID {signal.unique_id}"
+            indices_all.add(signal.unique_id)
 
         if warn_undriven:
             for signal in signals_used:
@@ -135,7 +159,11 @@ class LogicList:
             result += "\n"
         result += "  ],\n"
 
-        # luts and ffs
+        # "components"
+        result += "  connections: [\n"
+        for a, b in self.connections:
+            result += f"    {a} <-> {b}\n"
+        result += "  ],\n"
         result += "  luts: [\n"
         for lut in self.luts:
             table_str = "".join("1" if x else "0" for x in lut.table)
