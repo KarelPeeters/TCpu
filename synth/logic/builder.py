@@ -58,9 +58,15 @@ class BuilderValue(ABC):
     builder: 'LogicBuilder'
 
     @abstractmethod
-    def map(self, other: Optional[Self], f: Callable[[Signal, Optional[Signal]], Signal]) -> Self:
-        # TODO remove None option for other, we can always just use the value itself as the second one!
+    def map(self, other: Self, f: Callable[[Signal, Signal], Signal]) -> Self:
         raise NotImplementedError()
+
+    def map_single(self, f: Callable[[Signal], Signal]) -> Self:
+        def wrap(a, b):
+            assert b is a
+            return f(a)
+
+        return self.map(self, wrap)
 
     @abstractmethod
     def type_name(self) -> str:
@@ -74,13 +80,14 @@ class BuilderValue(ABC):
         # TODO expose the initial value?
         #   how? it's not just a bool but a constant monad instance containing bool instead of Signal
 
-        def f(a, b):
-            assert b is None
+        def f(a):
             return reduce(
-                lambda x, _: self.builder.logic.new_ff(x, init=False), range(n), a
+                lambda x, _: self.builder.logic.new_ff(x, init=False),
+                range(n),
+                a
             )
 
-        return self.map(None, f)
+        return self.map_single(f)
 
     def __imod__(self, other):
         """
@@ -120,9 +127,8 @@ class Bit(BuilderValue):
         return f"Bit({self.signal})"
 
     def map(self, other: Optional[Self], f: Callable[[Signal, Optional[Signal]], Signal]) -> Self:
-        if other is not None:
-            assert isinstance(other, Bit), f"Type mismatch: expected Optional[Bit], got {type(other)}"
-        return Bit(self.builder, f(self.signal, other.signal if other is not None else None))
+        assert isinstance(other, Bit), f"Type mismatch: expected Bit, got {type(other)}"
+        return Bit(self.builder, f(self.signal, other.signal))
 
     def type_name(self) -> str:
         return "bit"
@@ -180,14 +186,9 @@ class BitVec(BuilderValue):
         return f"BitVec({self.signals})"
 
     def map(self, other: Optional[Self], f: Callable[[Signal, Optional[Signal]], Signal]) -> Self:
-        if other is not None:
-            assert isinstance(other, BitVec), f"Type mismatch: expected Optional[BitVec], got {type(other)}"
-            assert len(self) == len(other), f"Length mismatch: {len(self)} vs {len(other)}"
-
-        if other is None:
-            return BitVec(self.builder, [f(a, None) for a in self.signals])
-        else:
-            return BitVec(self.builder, [f(a, b) for a, b in zip(self.signals, other.signals)])
+        assert isinstance(other, BitVec), f"Type mismatch: expected Optional[BitVec], got {type(other)}"
+        assert len(self) == len(other), f"Length mismatch: {len(self)} vs {len(other)}"
+        return BitVec(self.builder, [f(a, b) for a, b in zip(self.signals, other.signals)])
 
     def type_name(self) -> str:
         return f"bitvec[{len(self)}]"
@@ -253,9 +254,8 @@ class Unsigned(BuilderValue):
         return f"Unsigned({self.vec.signals})"
 
     def map(self, other: Optional[Self], f: Callable[[Signal, Optional[Signal]], Signal]) -> Self:
-        assert other is None or isinstance(other, Unsigned), \
-            f"Type mismatch: expected Optional[Unsigned], got {type(other)}"
-        return Unsigned(self.builder, self.vec.map(other.vec if other is not None else None, f))
+        assert isinstance(other, Unsigned), f"Type mismatch: expected Unsigned, got {type(other)}"
+        return Unsigned(self.builder, self.vec.map(other.vec, f))
 
     def type_name(self) -> str:
         return f"unsigned[{len(self)}]"
