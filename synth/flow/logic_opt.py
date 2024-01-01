@@ -1,6 +1,6 @@
 from synth.logic.logic_list import LogicList
-from synth.net.net_list import NetList
 
 
 def logic_optimization(_: LogicList):
-    raise NotImplementedError("TODO")
+    print("TODO: optimization is not implemented yet, doing nothing")
+    return

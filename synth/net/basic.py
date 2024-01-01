@@ -1,5 +1,6 @@
 from typing import List, Optional
 
+from synth.common import InvPair, OptionalInvPair
 from synth.net.components import NMOS, Resistor
 from synth.net.net_list import NetList, Wire
 
@@ -49,7 +50,6 @@ def gate_table(
     output = netlist.new_wire()
 
     for bits, value in enumerate(table):
-        print(f"{bits:0{len(inputs)}b} -> {value}")
         match value:
             case True:
                 # the resistor will pull up, which is also the cheapest option
@@ -59,7 +59,6 @@ def gate_table(
                 curr = output
                 for input_index in range(len(inputs)):
                     input_value = (bits >> input_index) & 1 != 0
-                    print(f"  {input_index}: {input_value}")
                     gate = input_wire(netlist, inputs, inverted_inputs, input_index, input_value)
                     next = netlist.new_wire()
                     netlist.push_component(NMOS(gate=gate, up=curr, down=next))
@@ -107,3 +106,32 @@ def gate_xor(netlist: NetList, *inputs: Wire) -> Wire:
     # for i in range(2 ** len(inputs)):
     #     pass
     raise NotImplementedError("TODO")
+
+
+def new_latch_partial(netlist: NetList, clk_pull: Wire, d: OptionalInvPair[Wire]) -> InvPair[Wire]:
+    d_val = d.val
+    d_inv = d.inv if d.inv is not None else gate_not(netlist, d.val)
+
+    # inverters
+    q_inv = gate_not(netlist, d_val)
+    q_val = gate_not(netlist, d_inv)
+
+    # writers
+    netlist.push_component(NMOS(gate=d_val, up=q_inv, down=clk_pull))
+    netlist.push_component(NMOS(gate=d_inv, up=q_val, down=clk_pull))
+
+    return InvPair(val=q_val, inv=q_inv)
+
+
+def new_latch(netlist: NetList, clk: Wire, d: OptionalInvPair[Wire]) -> InvPair[Wire]:
+    pull = netlist.new_wire()
+    netlist.push_component(NMOS(gate=clk, up=pull, down=netlist.gnd))
+    return new_latch_partial(netlist, pull, d)
+
+
+def new_ff(netlist: NetList, clk: Wire, d: OptionalInvPair[Wire]) -> InvPair[Wire]:
+    # TODO share clock inversion between FFs
+    clk_inv = gate_not(netlist, clk)
+    m = new_latch_partial(netlist, clk, d)
+    q = new_latch_partial(netlist, clk_inv, m)
+    return q

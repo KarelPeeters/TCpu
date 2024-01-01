@@ -42,12 +42,9 @@ class NetList:
     wires: list[Wire]
     components: list[Component]
 
-    vdd: Wire
-    gnd: Wire
-
     def __init__(self):
-        self.wires = []
-        self.components = []
+        self.wires: List[Wire] = []
+        self.components: List[Component] = []
 
         self.vdd = self.new_wire("vdd")
         self.vdd.full_name = "vdd"

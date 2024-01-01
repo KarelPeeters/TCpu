@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import reduce
-from typing import List, Callable, Self, Union, overload, Optional
+from typing import List, Callable, Self, Union, overload, Optional, TypeVar
 
 from synth.logic.logic_list import LogicList, Signal
 
@@ -14,6 +14,11 @@ class LogicBuilder:
     def const_bit(self, value: bool) -> 'Bit':
         signal = self.logic.new_lut([], [value])
         return Bit(self, signal)
+
+    def const_unsigned(self, bits: int, value: int) -> 'Unsigned':
+        assert 0 <= value < 2 ** bits
+        bits = [self.const_bit(value >> i != 0) for i in range(bits)]
+        return Unsigned(self, BitVec.from_bits(self, bits))
 
     def new_bit(self, debug_name: Optional[str] = None) -> 'Bit':
         return Bit(self, self.logic.new_signal(debug_name))
@@ -100,6 +105,9 @@ class BuilderValue(ABC):
         return self
 
 
+V = TypeVar('V', bound=BuilderValue)
+
+
 @dataclass
 class Bit(BuilderValue):
     signal: Signal
@@ -118,17 +126,34 @@ class Bit(BuilderValue):
     def type_name(self) -> str:
         return "bit"
 
-    def __invert__(self) -> 'Bit':
+    def __invert__(self) -> Self:
         return Bit(self.builder, self.builder.gate_not(self.signal))
 
-    def __and__(self, other: 'Bit') -> 'Bit':
+    def __and__(self, other: Self) -> Self:
         return Bit(self.builder, self.builder.gate_and([self.signal, other.signal]))
 
-    def __or__(self, other: 'Bit') -> 'Bit':
+    def __or__(self, other: Self) -> Self:
         return Bit(self.builder, self.builder.gate_or([self.signal, other.signal]))
 
-    def __xor__(self, other: 'Bit') -> 'Bit':
+    def __xor__(self, other: Self) -> Self:
         return Bit(self.builder, self.builder.gate_xor([self.signal, other.signal]))
+
+    def eq(self, other: Self) -> Self:
+        return ~self.neq(other)
+
+    def neq(self, other: Self) -> Self:
+        return Bit(self.builder, self.builder.gate_xor([self.signal, other.signal]))
+
+    def mux(self, value_0: V, value_1: V) -> Self:
+        inv = ~self
+
+        def f(signal_0, signal_1):
+            return self.builder.gate_or([
+                self.builder.gate_and([inv.signal, signal_0]),
+                self.builder.gate_and([self.signal, signal_1]),
+            ])
+
+        return value_0.map(value_1, f)
 
 
 @dataclass
@@ -261,9 +286,7 @@ class Unsigned(BuilderValue):
 
     def add_full(self, other: Union[Self, int], cin: Optional[Signal]) -> Self:
         if isinstance(other, int):
-            assert 0 <= other < 2 ** len(self)
-            bits = [self.builder.const_bit(other >> i != 0) for i in range(len(self))]
-            other = Unsigned(self.builder, BitVec.from_bits(self.builder, bits))
+            other = self.builder.const_unsigned(len(self), other)
 
         assert isinstance(other, Unsigned)
         assert cin is None or isinstance(cin, Signal)
