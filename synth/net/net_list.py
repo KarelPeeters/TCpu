@@ -67,23 +67,30 @@ class NetList:
         from synth.net.components import Bridge
         self.push_component(Bridge(a, b))
 
-    def print(self, component_cost: Optional[Dict[str, float]] = None):
-        print("NetList:")
-        print("  Wires:")
-        for wire in self.wires:
-            print(f"    {wire}")
-        print("  Components:")
-        for component in self.components:
-            print(f"    {component}")
+    def __str__(self):
+        result = ""
 
-        print("  Component counts:")
+        result += "NetList(\n"
+        result += "  wires=[\n"
+        for wire in self.wires:
+            result += f"    {wire},\n"
+        result += "  ],\n"
+        result += "  components=[\n"
+        for component in self.components:
+            result += f"    {component},\n"
+        result += "  ],\n"
+        result += ")\n"
+        return result
+
+    def print_cost(self, component_cost: Dict[str, float]):
+        print("NetList component counts:")
         counts = Counter(type(c) for c in self.components)
         for component_type, count in counts.items():
             print(f"    {component_type.__name__}: {count}")
-        if component_cost is not None:
-            total_cost = sum(
-                component_cost.get(component_type.__name__, 0) * count for component_type, count in counts.items())
-            print(f"  Total cost: {total_cost}")
+
+        total_cost = sum(
+            component_cost.get(component_type.__name__, 0) * count for component_type, count in counts.items())
+        print(f"Total cost: {total_cost}")
 
     def render(self):
         import graphviz

@@ -139,7 +139,7 @@ class LogicList:
         if warn_unused:
             for signal in signals_driven:
                 if signal not in signals_used:
-                    print(f"Warning: signal {signal} is driven but never signals")
+                    print(f"Warning: signal {signal} is driven but never used")
         if warn_unconnected:
             for signal in signals_all:
                 if signal not in signals_driven and signal not in signals_used:
