@@ -1,4 +1,4 @@
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from typing import List, Optional, Set
 
@@ -109,11 +109,16 @@ class LogicList:
         return output
 
     def validate(self, warn_unused=False, warn_undriven=False, warn_unconnected: bool = False):
-        # TODO support connections here
-
         signals_driven = set(self.external_inputs)
         signals_used = set(self.external_outputs)
         signals_all = set(self.signals)
+
+        connected = defaultdict(set)
+        for s in self.signals:
+            connected[s].add(s)
+        for a, b in self.connections:
+            connected[a].add(b)
+            connected[b].add(a)
 
         for lut in self.luts:
             signals_driven.add(lut.output)
@@ -134,15 +139,15 @@ class LogicList:
 
         if warn_undriven:
             for signal in signals_used:
-                if signal not in signals_driven:
+                if all(c not in signals_driven for c in connected[signal]):
                     print(f"Warning: signal {signal} is used but never driven")
         if warn_unused:
             for signal in signals_driven:
-                if signal not in signals_used:
+                if all(c not in signals_used for c in connected[signal]):
                     print(f"Warning: signal {signal} is driven but never used")
         if warn_unconnected:
             for signal in signals_all:
-                if signal not in signals_driven and signal not in signals_used:
+                if signal not in signals_driven and signal not in signals_used and len(connected[signal]) == 1:
                     print(f"Warning: signal {signal} is not connected to anything")
 
     def __str__(self):
