@@ -1,7 +1,6 @@
-from typing import Optional
-
-from synth.flow.synthesys import lower_logic_to_net
-from synth.logic.builder import LogicBuilder, Unsigned, Bit
+from synth.flow.logic_to_net import lower_logic_to_net
+from synth.flow.net_to_phys import net_to_phys
+from synth.logic.builder import LogicBuilder, Unsigned
 from synth.logic.logic_list import LogicList
 
 COMPONENT_COST = {
@@ -10,15 +9,9 @@ COMPONENT_COST = {
 }
 
 
-def build_counter(build: LogicBuilder, bits: int, reset: Optional[Bit]) -> Unsigned:
-    if reset is None:
-        reset = build.const_bit(False)
-
+def build_counter(build: LogicBuilder, bits: int) -> Unsigned:
     curr = build.new_unsigned(bits)
-    curr %= reset.mux(
-        build.const_unsigned(bits, 0),
-        curr.add_trunc(1)
-    )
+    curr %= curr.add_trunc(1).delay()
     return curr
 
 
@@ -26,7 +19,7 @@ def main():
     logic = LogicList()
     build = LogicBuilder(logic)
 
-    curr = build_counter(build, 32, reset=None)
+    curr = build_counter(build, 2)
     logic.mark_external_output(*curr.signals)
 
     logic.validate(warn_unused=True, warn_undriven=True, warn_unconnected=True)
@@ -35,6 +28,9 @@ def main():
     net = lower_logic_to_net(logic)
     net.print(COMPONENT_COST)
     # net.render()
+
+    sch = net_to_phys(net)
+    sch.to_file("ignored/output.kicad_sch")
 
 
 if __name__ == '__main__':

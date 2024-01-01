@@ -59,6 +59,7 @@ class BuilderValue(ABC):
 
     @abstractmethod
     def map(self, other: Optional[Self], f: Callable[[Signal, Optional[Signal]], Signal]) -> Self:
+        # TODO remove None option for other, we can always just use the value itself as the second one!
         raise NotImplementedError()
 
     @abstractmethod
