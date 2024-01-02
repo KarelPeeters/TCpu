@@ -24,6 +24,7 @@ def main():
     logic.mark_external_output(*curr.signals)
 
     logic.validate(warn_unused=True, warn_undriven=True, warn_unconnected=True)
+    logic.print_counts()
     # print(logic)
 
     net = lower_logic_to_net(logic)

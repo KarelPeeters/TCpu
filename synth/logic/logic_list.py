@@ -35,6 +35,7 @@ class Signal:
 @dataclass
 class LUT:
     output: Signal
+    # TODO document endianness of these lists (steal from the pulldown network builder)
     inputs: List[Signal]
     table: List[bool]
 
@@ -150,6 +151,16 @@ class LogicList:
                 if signal not in signals_driven and signal not in signals_used and len(connected[signal]) == 1:
                     print(f"Warning: signal {signal} is not connected to anything")
 
+    def _count_str(self) -> str:
+        result = ""
+        luts_per_input_count = Counter()
+        for lut in self.luts:
+            luts_per_input_count[len(lut.inputs)] += 1
+        result += f"    luts: {len(self.luts)},\n"
+        result += f"    ffs: {len(self.ffs)},\n"
+        result += f"    luts_per_input_count: {dict(luts_per_input_count)},"
+        return result
+
     def __str__(self):
         result = "LogicList(\n"
 
@@ -179,13 +190,13 @@ class LogicList:
             result += f"    {ff.output} = FF({ff.input}, {ff.init})\n"
         result += "  ],\n"
 
-        # counts
-        luts_per_input_count = Counter()
-        for lut in self.luts:
-            luts_per_input_count[len(lut.inputs)] += 1
-        result += f"  luts: {len(self.luts)},\n"
-        result += f"  ffs: {len(self.ffs)},\n"
-        result += f"  luts_per_input_count: {dict(luts_per_input_count)},"
+        result += "  counts: [\n"
+        result += self._count_str()
+        result += "\n  ],\n"
 
         result += ")"
         return result
+
+    def print_counts(self):
+        print("LogicList counts:")
+        print(self._count_str())
