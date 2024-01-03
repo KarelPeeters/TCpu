@@ -1,5 +1,6 @@
 from synth.flow.logic_to_net import lower_logic_to_net
 from synth.flow.net_to_phys import net_to_phys
+from synth.flow.net_to_place import net_to_place
 from synth.logic.builder import LogicBuilder, Unsigned
 from synth.logic.logic_list import LogicList
 
@@ -32,8 +33,10 @@ def main():
     net.print_cost(COMPONENT_COST)
     # net.render()
 
-    sch = net_to_phys(net)
-    sch.to_file("ignored/output.kicad_sch")
+    # sch = net_to_phys(net)
+    # sch.to_file("ignored/output.kicad_sch")
+
+    net_to_place(net)
 
 
 if __name__ == '__main__':

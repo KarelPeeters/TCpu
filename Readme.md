@@ -42,3 +42,8 @@ Other similar kicad interactions:
 * https://jeffmcbride.net/kicad-component-layout
 * https://github.com/inventree/InvenTree
 
+
+Place & Route algorithms:
+
+* Intro placement in Rust: https://stefanabikaram.com/writing/fpga-sa-placer/
+* Manhattan spanning tree: https://www.topcoder.com/thrive/articles/Line%20Sweep%20Algorithms
