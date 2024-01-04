@@ -1,5 +1,7 @@
 import math
+import os
 import random
+import time
 from typing import List, Dict, Tuple
 
 import numpy as np
@@ -39,6 +41,7 @@ class Grid:
 
         # initialize grid
         # TODO sadly random is worse than the default order for now :)
+        # TODO hierarchical grid? first raw placement, then more detailed in separate pass
         self.grid_size = math.ceil(math.sqrt(len(net.components)))
         self.grid = np.full((self.grid_size, self.grid_size), -1)
         self.component_to_grid_pos = []
@@ -176,30 +179,48 @@ def net_to_place(net: NetList):
     plt.show(block=False)
 
     cost = []
+    time_taken = []
     success_rate = []
     success_count = 0
 
-    for i in range(100_000):
+    start = time.perf_counter()
+
+    for i in range(40_000):
         success = grid.opt_step()
         cost.append(grid.curr_cost)
+        time_taken.append(time.perf_counter() - start)
 
         if success:
             success_count += 1
             print(f"Opt step {i}: {success}")
 
-        if (i+1) % 100 == 0:
+        if (i + 1) % 1000 == 0:
             success_rate.append(success_count / 100)
             success_count = 0
 
+            grid.plot()
+            plt.title(f"After {i + 1} steps")
+            os.makedirs("ignored/anneal/steps", exist_ok=True)
+            plt.savefig(f"ignored/anneal/steps/after_{i + 1:06}.png")
+            plt.close()
+
+    plt.figure()
+    plt.plot(time_taken, cost)
+    plt.title("Cost vs time")
+    plt.savefig("ignored/anneal/cost_vs_time.png")
+    plt.close()
+
     plt.figure()
     plt.plot(cost)
-    plt.title("Cost")
-    plt.show(block=False)
+    plt.title("Cost vs steps")
+    plt.savefig("ignored/anneal/cost_vs_steps.png")
+    plt.close()
 
     plt.figure()
     plt.plot(success_rate)
     plt.title("Success rate")
-    plt.show(block=False)
+    plt.savefig("ignored/anneal/success_rate.png")
+    plt.close()
 
     grid.plot()
     plt.title("After")
