@@ -42,7 +42,9 @@ class Grid:
         # initialize grid
         # TODO sadly random is worse than the default order for now :)
         # TODO hierarchical grid? first raw placement, then more detailed in separate pass
+        # TODO try making the grid a bit too large, it seems to speed things up
         self.grid_size = math.ceil(math.sqrt(len(net.components)))
+        self.grid_area = self.grid_size * self.grid_size
         self.grid = np.full((self.grid_size, self.grid_size), -1)
         self.component_to_grid_pos = []
 
@@ -90,9 +92,9 @@ class Grid:
         # TODO pick components attached to long wires
         #   bias second pick to be close to other connections to the wire
         # TODO allow swapping with empty spots
-        ai = np.random.randint(len(self.component_to_grid_pos))
-        bi = np.random.randint(len(self.component_to_grid_pos))
-        self.swap_components(ai, bi)
+        ai = np.random.randint(self.grid_area)
+        bi = np.random.randint(self.grid_area)
+        self.swap_grid_cells(ai, bi)
 
         # TODO memoize, only calculate cost for affected components (and wires)
         # TODO more generally don't make everything this horribly bad
@@ -104,19 +106,20 @@ class Grid:
             self.curr_cost = new_cost
             return True
         else:
-            self.swap_components(ai, bi)
+            self.swap_grid_cells(ai, bi)
             return False
 
-    def swap_components(self, ai: int, bi: int):
-        pa = self.component_to_grid_pos[ai]
-        pb = self.component_to_grid_pos[bi]
-        ax, ay = self.grid_index_to_xy(pa)
-        bx, by = self.grid_index_to_xy(pb)
+    def swap_grid_cells(self, ai: int, bi: int):
+        ax, ay = self.grid_index_to_xy(ai)
+        bx, by = self.grid_index_to_xy(bi)
 
-        self.component_to_grid_pos[ai] = pb
-        self.component_to_grid_pos[bi] = pa
-        self.grid[ax, ay] = bi
-        self.grid[bx, by] = ai
+        ca = self.grid[ax, ay]
+        cb = self.grid[bx, by]
+
+        self.grid[ax, ay] = cb
+        self.grid[bx, by] = ca
+        self.component_to_grid_pos[ca] = bi
+        self.component_to_grid_pos[cb] = ai
 
     def check_validness(self):
         for ci, gi in enumerate(self.component_to_grid_pos):
