@@ -219,11 +219,15 @@ class Grid:
 def net_to_place(net: NetList):
     grid = Grid(net)
     grid.check_validness()
-
     # print(grid.calc_total_cost())
+
+    os.makedirs("ignored/anneal/steps", exist_ok=True)
+
     grid.plot()
-    plt.title("Before")
+    plt.title("After 0 steps")
     plt.show(block=False)
+    plt.savefig(f"ignored/anneal/steps/after_{0:06}.png")
+    plt.close()
 
     cost = []
     time_taken = []
@@ -232,19 +236,19 @@ def net_to_place(net: NetList):
 
     start = time.perf_counter()
 
-    for i in range(1_000_000):
+    for i in range(4_000_000):
         success = grid.opt_step()
         cost.append(grid.curr_cost)
         time_taken.append(time.perf_counter() - start)
 
         if success:
             success_count += 1
-            print(f"Opt step {i}: {success}")
 
         if (i + 1) % 100_000 == 0:
             grid.check_validness()
 
-            success_rate.append(success_count / 100)
+            success_rate.append(success_count / 100_000)
+            print(f"Opt step {i + 1}: {success_count / 100_000}")
             success_count = 0
 
             grid.plot()
