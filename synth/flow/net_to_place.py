@@ -15,6 +15,7 @@ GRID_EMPTY = -2 ** 32
 class Grid:
     wire_to_index: Dict[Wire, int]
     wire_index_to_component_indices: List[List[int]]
+    wire_index_to_cost: List[int]
     component_index_to_wire_indices: List[List[int]]
     grid: np.ndarray
     component_to_grid_pos: List[int]
@@ -58,7 +59,8 @@ class Grid:
             self.grid[x, y] = ci
             self.component_to_grid_pos.append(gi)
 
-        self.curr_cost = self.calc_total_cost()
+        self.wire_index_to_cost = self.calc_wire_costs()
+        self.curr_cost = sum(self.wire_index_to_cost)
 
     def plot(self):
         plt.figure()
@@ -89,7 +91,7 @@ class Grid:
     def opt_step(self) -> bool:
         old_cost = self.curr_cost
 
-        # swap two random components
+        # swap two random grid locations
         # TODO pick components attached to long wires
         #   bias second pick to be close to other connections to the wire
         # TODO allow swapping with empty spots
@@ -97,14 +99,32 @@ class Grid:
         bi = np.random.randint(self.grid_area)
         self.swap_grid_cells(ai, bi)
 
-        # TODO memoize, only calculate cost for affected components (and wires)
-        # TODO more generally don't make everything this horribly bad
-        new_cost = self.calc_total_cost()
+        # collect affected wires
+        ca = self.grid[*self.grid_index_to_xy(ai)]
+        cb = self.grid[*self.grid_index_to_xy(bi)]
+        affected_wires = set()
+        if ca != GRID_EMPTY:
+            affected_wires.update(self.component_index_to_wire_indices[ca])
+        if cb != GRID_EMPTY:
+            affected_wires.update(self.component_index_to_wire_indices[cb])
 
+        # incrementally update cost
+        new_cost = self.curr_cost
+        affected_wires_cost = []
+        for wi in affected_wires:
+            cost, _ = self.min_spanning_tree_cost(wi)
+            affected_wires_cost.append(cost)
+            new_cost += cost - self.wire_index_to_cost[wi]
+
+        # check if improvement
         if new_cost < old_cost:
+            # keep
             self.curr_cost = new_cost
+            for wi, c in zip(affected_wires, affected_wires_cost):
+                self.wire_index_to_cost[wi] = c
             return True
         else:
+            # undo
             self.swap_grid_cells(ai, bi)
             return False
 
@@ -125,8 +145,9 @@ class Grid:
 
     def check_validness(self):
         print("Checking validness")
-        seen = set()
 
+        # check grid -> component
+        seen = set()
         for ci, gi in enumerate(self.component_to_grid_pos):
             x, y = self.grid_index_to_xy(gi)
             assert self.grid[x, y] == ci
@@ -137,14 +158,20 @@ class Grid:
                 x, y = self.grid_index_to_xy(gi)
                 assert self.grid[x, y] == GRID_EMPTY
 
-        assert self.curr_cost == self.calc_total_cost()
+        # check cached costs
+        wire_costs = self.calc_wire_costs()
+        for wi in range(len(self.wire_index_to_cost)):
+            assert wire_costs[wi] == self.wire_index_to_cost[wi]
+        assert self.curr_cost == sum(wire_costs)
 
-    def calc_total_cost(self) -> int:
-        total_cost = 0
+    def calc_wire_costs(self) -> List[int]:
+        wire_index_to_cost = []
+
         for wi in range(len(self.wire_to_index)):
             cost, _ = self.min_spanning_tree_cost(wi)
-            total_cost += cost
-        return total_cost
+            wire_index_to_cost.append(cost)
+
+        return wire_index_to_cost
 
     def min_spanning_tree_cost(self, wi: int) -> Tuple[int, List[Tuple[int, int]]]:
         todo = self.wire_index_to_component_indices[wi]
@@ -205,7 +232,7 @@ def net_to_place(net: NetList):
 
     start = time.perf_counter()
 
-    for i in range(40_000):
+    for i in range(1_000_000):
         success = grid.opt_step()
         cost.append(grid.curr_cost)
         time_taken.append(time.perf_counter() - start)
@@ -214,7 +241,7 @@ def net_to_place(net: NetList):
             success_count += 1
             print(f"Opt step {i}: {success}")
 
-        if (i + 1) % 1000 == 0:
+        if (i + 1) % 100_000 == 0:
             grid.check_validness()
 
             success_rate.append(success_count / 100)
