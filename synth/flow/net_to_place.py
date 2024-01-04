@@ -9,6 +9,8 @@ from matplotlib import pyplot as plt
 
 from synth.net.net_list import NetList, Wire
 
+GRID_EMPTY = -2 ** 32
+
 
 class Grid:
     wire_to_index: Dict[Wire, int]
@@ -45,20 +47,20 @@ class Grid:
         # TODO try making the grid a bit too large, it seems to speed things up
         self.grid_size = math.ceil(math.sqrt(len(net.components)))
         self.grid_area = self.grid_size * self.grid_size
-        self.grid = np.full((self.grid_size, self.grid_size), -1)
+        self.grid = np.full((self.grid_size, self.grid_size), GRID_EMPTY)
         self.component_to_grid_pos = []
 
-        indexed_components = list(enumerate(net.components))
+        indexed_components = list(range(len(net.components)))
         random.shuffle(indexed_components)
 
-        for ci, comp in indexed_components:
-            self.grid[ci % self.grid_size, ci // self.grid_size] = ci
-            self.component_to_grid_pos.append(ci)
+        for ci, gi in enumerate(indexed_components):
+            x, y = self.grid_index_to_xy(gi)
+            self.grid[x, y] = ci
+            self.component_to_grid_pos.append(gi)
 
         self.curr_cost = self.calc_total_cost()
 
     def plot(self):
-        import matplotlib.pyplot as plt
         plt.figure()
         ax = plt.gca()
 
@@ -86,7 +88,6 @@ class Grid:
 
     def opt_step(self) -> bool:
         old_cost = self.curr_cost
-        # self.check_validness()
 
         # swap two random components
         # TODO pick components attached to long wires
@@ -99,8 +100,6 @@ class Grid:
         # TODO memoize, only calculate cost for affected components (and wires)
         # TODO more generally don't make everything this horribly bad
         new_cost = self.calc_total_cost()
-
-        # self.check_validness()
 
         if new_cost < old_cost:
             self.curr_cost = new_cost
@@ -118,13 +117,27 @@ class Grid:
 
         self.grid[ax, ay] = cb
         self.grid[bx, by] = ca
-        self.component_to_grid_pos[ca] = bi
-        self.component_to_grid_pos[cb] = ai
+
+        if ca != GRID_EMPTY:
+            self.component_to_grid_pos[ca] = bi
+        if cb != GRID_EMPTY:
+            self.component_to_grid_pos[cb] = ai
 
     def check_validness(self):
+        print("Checking validness")
+        seen = set()
+
         for ci, gi in enumerate(self.component_to_grid_pos):
             x, y = self.grid_index_to_xy(gi)
             assert self.grid[x, y] == ci
+            seen.add(gi)
+
+        for gi in range(self.grid_area):
+            if gi not in seen:
+                x, y = self.grid_index_to_xy(gi)
+                assert self.grid[x, y] == GRID_EMPTY
+
+        assert self.curr_cost == self.calc_total_cost()
 
     def calc_total_cost(self) -> int:
         total_cost = 0
@@ -137,6 +150,9 @@ class Grid:
         todo = self.wire_index_to_component_indices[wi]
         if len(todo) <= 1:
             return 0, []
+
+        # weirdly optimizing this for small nets doesn't matter much:
+        #   is there a terrible slowdown for large nets?
 
         total_cost = 0
         done = [todo[0]]
@@ -175,6 +191,7 @@ class Grid:
 
 def net_to_place(net: NetList):
     grid = Grid(net)
+    grid.check_validness()
 
     # print(grid.calc_total_cost())
     grid.plot()
@@ -198,6 +215,8 @@ def net_to_place(net: NetList):
             print(f"Opt step {i}: {success}")
 
         if (i + 1) % 1000 == 0:
+            grid.check_validness()
+
             success_rate.append(success_count / 100)
             success_count = 0
 
