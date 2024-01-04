@@ -1,7 +1,9 @@
 import math
+import random
 from typing import List, Dict, Tuple
 
 import numpy as np
+from matplotlib import pyplot as plt
 
 from synth.net.net_list import NetList, Wire
 
@@ -36,11 +38,15 @@ class Grid:
         print(counts)
 
         # initialize grid
-        # TODO try random instead
+        # TODO sadly random is worse than the default order for now :)
         self.grid_size = math.ceil(math.sqrt(len(net.components)))
         self.grid = np.full((self.grid_size, self.grid_size), -1)
         self.component_to_grid_pos = []
-        for ci, comp in enumerate(net.components):
+
+        indexed_components = list(enumerate(net.components))
+        random.shuffle(indexed_components)
+
+        for ci, comp in indexed_components:
             self.grid[ci % self.grid_size, ci // self.grid_size] = ci
             self.component_to_grid_pos.append(ci)
 
@@ -72,7 +78,47 @@ class Grid:
 
         ax.set_xlim(0, self.grid_size)
         ax.set_ylim(0, self.grid_size)
-        plt.show()
+
+    def opt_step(self) -> bool:
+        old_cost = self.curr_cost
+        # self.check_validness()
+
+        # swap two random components
+        # TODO pick components attached to long wires
+        #   bias second pick to be close to other connections to the wire
+        # TODO allow swapping with empty spots
+        ai = np.random.randint(len(self.component_to_grid_pos))
+        bi = np.random.randint(len(self.component_to_grid_pos))
+        self.swap_components(ai, bi)
+
+        # TODO memoize, only calculate cost for affected components (and wires)
+        # TODO more generally don't make everything this horribly bad
+        new_cost = self.calc_total_cost()
+
+        # self.check_validness()
+
+        if new_cost < old_cost:
+            self.curr_cost = new_cost
+            return True
+        else:
+            self.swap_components(ai, bi)
+            return False
+
+    def swap_components(self, ai: int, bi: int):
+        pa = self.component_to_grid_pos[ai]
+        pb = self.component_to_grid_pos[bi]
+        ax, ay = self.grid_index_to_xy(pa)
+        bx, by = self.grid_index_to_xy(pb)
+
+        self.component_to_grid_pos[ai] = pb
+        self.component_to_grid_pos[bi] = pa
+        self.grid[ax, ay] = bi
+        self.grid[bx, by] = ai
+
+    def check_validness(self):
+        for ci, gi in enumerate(self.component_to_grid_pos):
+            x, y = self.grid_index_to_xy(gi)
+            assert self.grid[x, y] == ci
 
     def calc_total_cost(self) -> int:
         total_cost = 0
@@ -98,7 +144,7 @@ class Grid:
 
             for ci in todo:
                 for bi in done:
-                    cost = self.grid_dist(ci, bi)
+                    cost = self.grid_dist(self.component_to_grid_pos[ci], self.component_to_grid_pos[bi])
                     if cost < best_cost:
                         best_cost = cost
                         best_ci = ci
@@ -124,6 +170,37 @@ class Grid:
 def net_to_place(net: NetList):
     grid = Grid(net)
 
-    print(grid.calc_total_cost())
+    # print(grid.calc_total_cost())
+    grid.plot()
+    plt.title("Before")
+    plt.show(block=False)
+
+    cost = []
+    success_rate = []
+    success_count = 0
+
+    for i in range(100_000):
+        success = grid.opt_step()
+        cost.append(grid.curr_cost)
+
+        if success:
+            success_count += 1
+            print(f"Opt step {i}: {success}")
+
+        if (i+1) % 100 == 0:
+            success_rate.append(success_count / 100)
+            success_count = 0
+
+    plt.figure()
+    plt.plot(cost)
+    plt.title("Cost")
+    plt.show(block=False)
+
+    plt.figure()
+    plt.plot(success_rate)
+    plt.title("Success rate")
+    plt.show(block=False)
 
     grid.plot()
+    plt.title("After")
+    plt.show()
