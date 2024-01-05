@@ -1,4 +1,3 @@
-import abc
 import math
 import os
 import random
@@ -89,7 +88,7 @@ class Grid:
         ax.set_xlim(0, self.grid_size)
         ax.set_ylim(0, self.grid_size)
 
-    def try_swap_cells(self, ai: int, bi: int) -> bool:
+    def try_swap_cells(self, ai: int, bi: int, temp: float) -> bool:
         # swap
         if not self.swap_grid_cells_leave_cost(ai, bi):
             return False
@@ -112,7 +111,8 @@ class Grid:
             new_cost += cost - self.wire_index_to_cost[wi]
 
         # check if improvement
-        if new_cost < self.curr_cost:
+        # TODO use actual temperature here? is it actually useful? why?
+        if new_cost < self.curr_cost or np.random.uniform() < temp:
             # keep
             self.curr_cost = new_cost
             for wi, c in zip(affected_wires, affected_wires_cost):
@@ -209,10 +209,17 @@ class Grid:
         return total_cost, edges
 
     def grid_dist(self, g0: int, g1: int) -> int:
+        # TODO maybe a mix of manhattan and euclidean?
+        #   pick whatever ends up best approximating the real wire length?
+        #   do we even want to optimize total wire length? we really want PCB area!
+
         # manhattan for now
         x0, y0 = self.grid_index_to_xy(g0)
         x1, y1 = self.grid_index_to_xy(g1)
         return abs(x1 - x0) + abs(y1 - y0)
+
+        # euclidean
+        # return math.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2)
 
     def grid_index_to_xy(self, gi: int) -> (int, int):
         return gi % self.grid_size, gi // self.grid_size
@@ -264,13 +271,13 @@ class Grid:
 
         return ga, gb
 
-    def opt_step(self) -> bool:
+    def opt_step(self, temp: float) -> bool:
         ga, gb = self.pick_swap_random()
         # if np.random.uniform() < 0.5:
         #     ga, gb = self.pick_swap_random()
         # else:
         #     ga, gb = self.pick_swap_directional()
-        return self.try_swap_cells(ga, gb)
+        return self.try_swap_cells(ga, gb, temp)
 
 
 def net_to_place(net: NetList):
@@ -292,10 +299,10 @@ def net_to_place(net: NetList):
     success_count = 0
 
     start = time.perf_counter()
-    delta_iters = 1_000
+    delta_iters = 100_000
 
     for i in range(1_000_000):
-        success = grid.opt_step()
+        success = grid.opt_step(temp=1-i/1_000_000)
         cost.append(grid.curr_cost)
         time_taken.append(time.perf_counter() - start)
 
@@ -335,4 +342,5 @@ def net_to_place(net: NetList):
 
     grid.plot()
     plt.title("After")
+    plt.savefig("ignored/anneal/after.png")
     plt.show()
