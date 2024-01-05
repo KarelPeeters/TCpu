@@ -1,3 +1,4 @@
+import abc
 import math
 import os
 import random
@@ -15,7 +16,7 @@ GRID_EMPTY = -2 ** 32
 class Grid:
     wire_to_index: Dict[Wire, int]
     wire_index_to_component_indices: List[List[int]]
-    wire_index_to_cost: List[int]
+    wire_index_to_cost: np.array
     component_index_to_wire_indices: List[List[int]]
     grid: np.ndarray
     component_to_grid_pos: List[int]
@@ -60,7 +61,7 @@ class Grid:
             self.component_to_grid_pos.append(gi)
 
         self.wire_index_to_cost = self.calc_wire_costs()
-        self.curr_cost = sum(self.wire_index_to_cost)
+        self.curr_cost = np.sum(self.wire_index_to_cost)
 
     def plot(self):
         plt.figure()
@@ -88,16 +89,10 @@ class Grid:
         ax.set_xlim(0, self.grid_size)
         ax.set_ylim(0, self.grid_size)
 
-    def opt_step(self) -> bool:
-        old_cost = self.curr_cost
-
-        # swap two random grid locations
-        # TODO pick components attached to long wires
-        #   bias second pick to be close to other connections to the wire
-        # TODO allow swapping with empty spots
-        ai = np.random.randint(self.grid_area)
-        bi = np.random.randint(self.grid_area)
-        self.swap_grid_cells(ai, bi)
+    def try_swap_cells(self, ai: int, bi: int) -> bool:
+        # swap
+        if not self.swap_grid_cells_leave_cost(ai, bi):
+            return False
 
         # collect affected wires
         ca = self.grid[*self.grid_index_to_xy(ai)]
@@ -117,7 +112,7 @@ class Grid:
             new_cost += cost - self.wire_index_to_cost[wi]
 
         # check if improvement
-        if new_cost < old_cost:
+        if new_cost < self.curr_cost:
             # keep
             self.curr_cost = new_cost
             for wi, c in zip(affected_wires, affected_wires_cost):
@@ -125,15 +120,21 @@ class Grid:
             return True
         else:
             # undo
-            self.swap_grid_cells(ai, bi)
+            self.swap_grid_cells_leave_cost(ai, bi)
             return False
 
-    def swap_grid_cells(self, ai: int, bi: int):
+    def swap_grid_cells_leave_cost(self, ai: int, bi: int) -> bool:
+        if ai == bi:
+            return False
+
         ax, ay = self.grid_index_to_xy(ai)
         bx, by = self.grid_index_to_xy(bi)
 
         ca = self.grid[ax, ay]
         cb = self.grid[bx, by]
+        if ca == cb:
+            # both must be empty
+            return False
 
         self.grid[ax, ay] = cb
         self.grid[bx, by] = ca
@@ -142,6 +143,7 @@ class Grid:
             self.component_to_grid_pos[ca] = bi
         if cb != GRID_EMPTY:
             self.component_to_grid_pos[cb] = ai
+        return True
 
     def check_validness(self):
         print("Checking validness")
@@ -164,12 +166,12 @@ class Grid:
             assert wire_costs[wi] == self.wire_index_to_cost[wi]
         assert self.curr_cost == sum(wire_costs)
 
-    def calc_wire_costs(self) -> List[int]:
-        wire_index_to_cost = []
+    def calc_wire_costs(self) -> np.array:
+        wire_index_to_cost = np.zeros(len(self.wire_to_index), dtype=int)
 
         for wi in range(len(self.wire_to_index)):
             cost, _ = self.min_spanning_tree_cost(wi)
-            wire_index_to_cost.append(cost)
+            wire_index_to_cost[wi] = cost
 
         return wire_index_to_cost
 
@@ -215,10 +217,65 @@ class Grid:
     def grid_index_to_xy(self, gi: int) -> (int, int):
         return gi % self.grid_size, gi // self.grid_size
 
+    def pick_swap_random(self):
+        ai = random.randrange(self.grid_area)
+        bi = random.randrange(self.grid_area)
+        return ai, bi
+
+    def pick_swap_long_wire(self):
+        # pick random cell attached to long wire
+        # TODO optimize this using priority queue
+        wi = np.random.choice(len(self.wire_index_to_cost), p=self.wire_index_to_cost / np.sum(self.wire_index_to_cost))
+        # pick random component attached to that wire
+        ai = self.component_to_grid_pos[np.random.choice(self.wire_index_to_component_indices[wi])]
+
+        # pick second cell fully randomly
+        bi = np.random.randint(self.grid_area)
+        return ai, bi
+
+    def pick_swap_directional(self):
+        # pick a random component
+        ca = random.randrange(len(self.component_to_grid_pos))
+        ga = self.component_to_grid_pos[ca]
+
+        # pick second cell in direction of the centroid of all connected components
+        sum_x = 0
+        sum_y = 0
+        sum_n = 0
+
+        for wi in self.component_index_to_wire_indices[ca]:
+            for c_other in self.wire_index_to_component_indices[wi]:
+                if c_other != ca:
+                    x_other, y_other = self.grid_index_to_xy(self.component_to_grid_pos[c_other])
+                    sum_x += x_other
+                    sum_y += y_other
+                    sum_n += 1
+
+        mid_x = sum_x / sum_n
+        mid_y = sum_y / sum_n
+
+        variance = self.grid_size / 10
+
+        pick_x = np.clip(int(mid_x + np.random.normal() * variance), 0, self.grid_size - 1)
+        pick_y = np.clip(int(mid_y + np.random.normal() * variance), 0, self.grid_size - 1)
+
+        gb = pick_x + pick_y * self.grid_size
+        assert self.grid_index_to_xy(gb) == (pick_x, pick_y)
+
+        return ga, gb
+
+    def opt_step(self) -> bool:
+        ga, gb = self.pick_swap_random()
+        # if np.random.uniform() < 0.5:
+        #     ga, gb = self.pick_swap_random()
+        # else:
+        #     ga, gb = self.pick_swap_directional()
+        return self.try_swap_cells(ga, gb)
+
 
 def net_to_place(net: NetList):
     grid = Grid(net)
-    grid.check_validness()
+    # grid.check_validness()
     # print(grid.calc_total_cost())
 
     os.makedirs("ignored/anneal/steps", exist_ok=True)
@@ -235,8 +292,9 @@ def net_to_place(net: NetList):
     success_count = 0
 
     start = time.perf_counter()
+    delta_iters = 1_000
 
-    for i in range(4_000_000):
+    for i in range(1_000_000):
         success = grid.opt_step()
         cost.append(grid.curr_cost)
         time_taken.append(time.perf_counter() - start)
@@ -244,11 +302,11 @@ def net_to_place(net: NetList):
         if success:
             success_count += 1
 
-        if (i + 1) % 100_000 == 0:
-            grid.check_validness()
+        if (i + 1) % delta_iters == 0:
+            # grid.check_validness()
 
-            success_rate.append(success_count / 100_000)
-            print(f"Opt step {i + 1}: {success_count / 100_000}")
+            success_rate.append(success_count / delta_iters)
+            print(f"Opt step {i + 1}: success={success_count / delta_iters}, cost={grid.curr_cost}")
             success_count = 0
 
             grid.plot()
