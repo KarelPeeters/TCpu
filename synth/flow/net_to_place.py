@@ -213,13 +213,14 @@ class Grid:
         #   pick whatever ends up best approximating the real wire length?
         #   do we even want to optimize total wire length? we really want PCB area!
 
-        # manhattan for now
         x0, y0 = self.grid_index_to_xy(g0)
         x1, y1 = self.grid_index_to_xy(g1)
+
+        # manhattan for now
         return abs(x1 - x0) + abs(y1 - y0)
 
         # euclidean
-        # return math.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2)
+        # return (x1 - x0) ** 2 + (y1 - y0) ** 2
 
     def grid_index_to_xy(self, gi: int) -> (int, int):
         return gi % self.grid_size, gi // self.grid_size
@@ -301,8 +302,8 @@ def net_to_place(net: NetList):
     start = time.perf_counter()
     delta_iters = 100_000
 
-    for i in range(1_000_000):
-        success = grid.opt_step(temp=1-i/1_000_000)
+    for i in range(20_000_000):
+        success = grid.opt_step(temp=0)
         cost.append(grid.curr_cost)
         time_taken.append(time.perf_counter() - start)
 
