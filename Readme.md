@@ -12,6 +12,19 @@
 * Regfile chip?
 * Clocking stuff
 
+# Capabilities
+
+https://jlcpcb.com/capabilities/Capabilities
+* minimum via size?
+  * hole: 0.15mm, diameter: 0.25mm
+* minimum trace size?
+  * width: 0.09mm, spacing: 0.09mm
+  * do we ever need to care about the resistance?
+* parasitic capacitance in wires, transistors, resistors, ...
+  
+* Figure out t_hold and t_setup!
+  * analog SPICE simulation?
+
 # PCB cost estimate:
 
 JLCPCB board cost:
