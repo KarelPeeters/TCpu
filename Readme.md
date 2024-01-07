@@ -12,7 +12,7 @@
 * Regfile chip?
 * Clocking stuff
 
-# Capabilities
+# PCB Capabilities
 
 https://jlcpcb.com/capabilities/Capabilities
 * minimum via size?
@@ -61,3 +61,13 @@ Place & Route algorithms:
 
 * Intro placement in Rust: https://stefanabikaram.com/writing/fpga-sa-placer/
 * Manhattan spanning tree: https://www.topcoder.com/thrive/articles/Line%20Sweep%20Algorithms
+
+# Final processor design
+
+* 8/16/32 bit?
+* RISCV? Something else? Something custom?
+* RAM/ROM embedded or via pins?
+* clock generation on-board?
+* VGA out? audio out?
+* GPIO pins?
+* Leds?
