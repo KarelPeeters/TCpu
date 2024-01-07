@@ -145,6 +145,8 @@ class LogicList:
         self.external_outputs = {replace(s) for s in self.external_outputs}
         new.debug_names.update(old.debug_names)
 
+        self.signals = [s for s in self.signals if s is not old]
+
         return count
 
     def validate(self, warn_unused=False, warn_undriven=False, warn_unconnected: bool = False):

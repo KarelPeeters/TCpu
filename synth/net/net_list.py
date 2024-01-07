@@ -1,7 +1,7 @@
 from abc import abstractmethod, ABC
 from collections import Counter
 from dataclasses import dataclass
-from typing import List, Optional, Dict, Set
+from typing import List, Optional, Dict, Set, Callable
 
 
 class Wire:
@@ -42,6 +42,10 @@ class Component(ABC):
     def ports(self) -> List[Port]:
         raise NotImplementedError()
 
+    @abstractmethod
+    def replace_wire(self, f: Callable[[Wire], Wire]):
+        raise NotImplementedError()
+
 
 class NetList:
     # TODO set? ordered set?
@@ -74,6 +78,26 @@ class NetList:
     def connect(self, a: Wire, b: Wire):
         from synth.net.components import Bridge
         self.push_component(Bridge(a, b))
+
+    def replace_wire(self, old: Wire, new: Wire) -> int:
+        if old is new:
+            return 0
+
+        count = 0
+
+        def replace(s: Wire) -> Wire:
+            nonlocal count
+            if s is old:
+                count += 1
+                return new
+            return s
+
+        for c in self.components:
+            c.replace_wire(replace)
+
+        new.debug_names.update(old.debug_names)
+
+        return count
 
     def __str__(self):
         result = ""

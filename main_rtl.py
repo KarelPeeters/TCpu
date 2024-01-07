@@ -1,6 +1,7 @@
 from design.serv import build_cpu_serv
 from synth.flow.logic_opt import optimize_logic
 from synth.flow.logic_to_net import lower_logic_to_net
+from synth.flow.net_opt import optimize_net
 from synth.flow.net_to_place import net_to_place
 from synth.logic.builder import LogicBuilder, Unsigned
 from synth.logic.logic_list import LogicList
@@ -32,19 +33,24 @@ def main():
         logic.mark_external_output(b.signal)
 
     print("====================")
-    print("Before optimization:")
+    print("Raw:")
     logic.validate(warn_unused=True, warn_undriven=True, warn_unconnected=True)
     logic.print_counts()
     net_unopt = lower_logic_to_net(logic)
     net_unopt.print_cost(COMPONENT_COST)
 
+    print("====================")
+    print("Logic opt:")
     optimize_logic(logic)
 
-    print("====================")
-    print("After optimization:")
     logic.validate(warn_unused=True, warn_undriven=True, warn_unconnected=True)
     logic.print_counts()
     net = lower_logic_to_net(logic)
+    net.print_cost(COMPONENT_COST)
+
+    print("====================")
+    print("Net opt:")
+    optimize_net(net)
     net.print_cost(COMPONENT_COST)
 
     # sch = net_to_phys(net)
