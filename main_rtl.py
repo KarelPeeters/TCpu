@@ -1,5 +1,5 @@
+from design.serv import build_cpu_serv
 from synth.flow.logic_to_net import lower_logic_to_net
-from synth.flow.net_to_phys import net_to_phys
 from synth.flow.net_to_place import net_to_place
 from synth.logic.builder import LogicBuilder, Unsigned
 from synth.logic.logic_list import LogicList
@@ -21,8 +21,14 @@ def main():
     logic = LogicList()
     build = LogicBuilder(logic)
 
-    curr = build_counter(build, 16)
-    logic.mark_external_output(*curr.signals)
+    # curr = build_counter(build, 16)
+    # logic.mark_external_output(*curr.signals)
+
+    interface = build_cpu_serv(build)
+    for b in interface.inputs:
+        logic.mark_external_input(b.signal)
+    for b in interface.outputs:
+        logic.mark_external_output(b.signal)
 
     logic.validate(warn_unused=True, warn_undriven=True, warn_unconnected=True)
     logic.print_counts()

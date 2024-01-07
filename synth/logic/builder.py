@@ -162,6 +162,13 @@ class Bit(BuilderValue):
 
         return value_0.map(value_1, f)
 
+    @staticmethod
+    def full_add(a: 'Bit', b: 'Bit', c: 'Bit') -> ('Bit', 'Bit'):
+        """Full adder, returning (carry, sum)"""
+        c_out = (a & b) | (a & c) | (b & c)
+        sum = a ^ b ^ c
+        return c_out, sum
+
 
 @dataclass
 class BitVec(BuilderValue):
@@ -242,6 +249,12 @@ class BitVec(BuilderValue):
     def as_unsigned(self) -> Self:
         return Unsigned(self.builder, self)
 
+    def any(self) -> Bit:
+        return Bit(self.builder, self.builder.gate_or(self.signals))
+
+    def all(self) -> Bit:
+        return Bit(self.builder, self.builder.gate_and(self.signals))
+
 
 @dataclass
 class Unsigned(BuilderValue):
@@ -285,12 +298,12 @@ class Unsigned(BuilderValue):
         assert self.builder is other.builder
         return Unsigned(self.builder, self.vec.__xor__(other.vec))
 
-    def add_full(self, other: Union[Self, int], cin: Optional[Signal]) -> Self:
+    def add_full(self, other: Union[Self, int], cin: Optional[Bit]) -> Self:
         if isinstance(other, int):
             other = self.builder.const_unsigned(len(self), other)
 
         assert isinstance(other, Unsigned)
-        assert cin is None or isinstance(cin, Signal)
+        assert cin is None or isinstance(cin, Bit)
         assert self.builder is other.builder
         assert len(self) == len(other)
 
@@ -298,17 +311,13 @@ class Unsigned(BuilderValue):
         result = []
 
         for i in range(len(self)):
-            x = self.vec[i]
-            y = other.vec[i]
-
-            # full adder
-            result.append(x ^ y ^ carry)
-            carry = (x & y) | (x & carry) | (y & carry)
+            carry, result_i = Bit.full_add(self.vec[i], other.vec[i], carry)
+            result.append(result_i)
 
         result.append(carry)
         return Unsigned(self.builder, BitVec.from_bits(self.builder, result))
 
-    def add_trunc(self, other: Union[Self, int], cin: Optional[Signal] = None) -> Self:
+    def add_trunc(self, other: Union[Self, int], cin: Optional[Bit] = None) -> Self:
         result = self.add_full(other, cin)
         return result.as_vec()[:-1].as_unsigned()
 
