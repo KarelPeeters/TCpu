@@ -116,6 +116,37 @@ class LogicList:
         self.push_ff(ff)
         return output
 
+    def replace_signal(self, old: Signal, new: Signal) -> int:
+        if old is new:
+            return 0
+
+        count = 0
+
+        def replace(s: Signal) -> Signal:
+            nonlocal count
+            if s is old:
+                count += 1
+                return new
+            return s
+
+        for i in range(len(self.connections)):
+            a, b = self.connections[i]
+            self.connections[i] = (replace(a), replace(b))
+
+        for lut in self.luts:
+            lut.output = replace(lut.output)
+            lut.inputs = [replace(s) for s in lut.inputs]
+
+        for ff in self.ffs:
+            ff.input = replace(ff.input)
+            ff.output = replace(ff.output)
+
+        self.external_inputs = {replace(s) for s in self.external_inputs}
+        self.external_outputs = {replace(s) for s in self.external_outputs}
+        new.debug_names.update(old.debug_names)
+
+        return count
+
     def validate(self, warn_unused=False, warn_undriven=False, warn_unconnected: bool = False):
         signals_driven = set(self.external_inputs)
         signals_used = set(self.external_outputs)
@@ -165,6 +196,7 @@ class LogicList:
             luts_per_input_count[len(lut.inputs)] += 1
         result += f"    luts: {len(self.luts)},\n"
         result += f"    ffs: {len(self.ffs)},\n"
+        result += f"    cons: {len(self.connections)},\n"
         result += f"    luts_per_input_count: {dict(luts_per_input_count)},"
         return result
 
