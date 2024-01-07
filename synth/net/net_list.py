@@ -1,21 +1,27 @@
 from abc import abstractmethod, ABC
 from collections import Counter
 from dataclasses import dataclass
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Set
 
 
 class Wire:
-    def __init__(self, id: int, debug_name: Optional[str] = None):
-        self.id = id
-        self.debug_name = debug_name
-        self.full_name = None
+    unique_id: int
+    debug_names: Set[str]
+    special_name: Optional[str]
+
+    def __init__(self, unique_id: int):
+        self.unique_id = unique_id
+
+        self.debug_names = set()
+        self.special_name = None
 
     def __str__(self):
-        if self.full_name is not None:
-            return f"\"{self.full_name}\""
-        if self.debug_name is not None:
-            return f"Wire({self.id}, \"{self.debug_name}\")"
-        return f"Wire({self.id})"
+        suffix = ""
+        if self.special_name is not None:
+            suffix += f", {self.special_name}"
+        if len(self.debug_names):
+            suffix += f", debug={self.debug_names}"
+        return f"Wire({self.unique_id}{suffix})"
 
     def __repr__(self):
         return str(self)
@@ -56,7 +62,9 @@ class NetList:
         self.global_wires = [self.vdd, self.gnd, self.clk]
 
     def new_wire(self, debug_name: Optional[str] = None) -> Wire:
-        wire = Wire(len(self.wires), debug_name)
+        wire = Wire(len(self.wires))
+        if debug_name is not None:
+            wire.debug_names.add(debug_name)
         self.wires.append(wire)
         return wire
 
@@ -102,7 +110,7 @@ class NetList:
         for wire in self.wires:
             if wire in self.global_wires:
                 continue
-            dot.node(name=f"wire_{wire.id}", label=str(wire))
+            dot.node(name=f"wire_{wire.unique_id}", label=str(wire))
 
         for component in self.components:
             dot.node(name=f"component_{id(component)}", label=str(component), shape="box")
@@ -127,7 +135,7 @@ class NetList:
                     next_dummy_index += 1
                     head_name = f"dummy_{next_dummy_index - 1}"
                 else:
-                    head_name = f"wire_{wire.id}"
+                    head_name = f"wire_{wire.unique_id}"
                     dir = "none"
 
                 dot.edge(f"component_{id(component)}", head_name, tailport=port.dir, dir=dir, arrowhead="none")

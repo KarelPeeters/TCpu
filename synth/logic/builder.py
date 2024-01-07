@@ -20,12 +20,12 @@ class LogicBuilder:
         bits = [self.const_bit(value >> i != 0) for i in range(bits)]
         return Unsigned(self, BitVec.from_bits(self, bits))
 
-    def new_bit(self, debug_name: Optional[str] = None) -> 'Bit':
-        return Bit(self, self.logic.new_signal(debug_name))
+    def new_bit(self, name: Optional[str]) -> 'Bit':
+        return Bit(self, self.logic.new_signal(name))
 
-    def new_bitvec(self, n: int, debug_name: Optional[str] = None) -> 'BitVec':
+    def new_bitvec(self, n: int, name: Optional[str] = None) -> 'BitVec':
         signals = [
-            self.logic.new_signal(f"{debug_name}[{i}]" if debug_name is not None else None)
+            self.logic.new_signal(f"{name}[{i}]" if name is not None else None)
             for i in range(n)
         ]
         return BitVec(self, signals)

@@ -12,8 +12,9 @@ def lower_logic_to_net(logic: LogicList) -> NetList:
     # signals
     signal_to_wire = {}
     for signal in logic.signals:
-        wire = net.new_wire(signal.debug_name)
-        wire.full_name = signal.full_name
+        wire = net.new_wire()
+        wire.special_name = signal.special_name
+        wire.debug_names = signal.debug_names
         signal_to_wire[signal] = wire
 
     # actual blocks

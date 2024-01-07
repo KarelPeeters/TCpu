@@ -1,4 +1,5 @@
 from design.serv import build_cpu_serv
+from synth.flow.logic_opt import logic_optimization
 from synth.flow.logic_to_net import lower_logic_to_net
 from synth.flow.net_to_place import net_to_place
 from synth.logic.builder import LogicBuilder, Unsigned
@@ -30,9 +31,14 @@ def main():
     for b in interface.outputs:
         logic.mark_external_output(b.signal)
 
+    print("Logic before optimization:")
     logic.validate(warn_unused=True, warn_undriven=True, warn_unconnected=True)
     logic.print_counts()
     # print(logic)
+
+    print("Logic after optimization:")
+    logic_optimization(logic)
+    logic.print_counts()
 
     net = lower_logic_to_net(logic)
     # print(net)

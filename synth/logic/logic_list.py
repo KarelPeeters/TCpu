@@ -5,15 +5,19 @@ from typing import List, Optional, Set
 
 class Signal:
     unique_id: int
-    debug_name: Optional[str]
-    full_name: Optional[str]
+    debug_names: Set[str]
+    special_name: Optional[str]
+
     logic: 'LogicList'
 
-    def __init__(self, unique_id: int, debug_name: Optional[str], logic: 'LogicList'):
+    def __init__(self, logic: 'LogicList', unique_id: int):
         self.unique_id = unique_id
-        self.debug_name = debug_name
+        self.debug_names = set()
+        self.special_name = None
         self.logic = logic
-        self.full_name = None
+
+    def add_name(self, debug_name: str):
+        self.debug_names.add(debug_name)
 
     def __hash__(self):
         return id(self)
@@ -22,11 +26,12 @@ class Signal:
         return self is other
 
     def __str__(self):
-        if self.full_name is not None:
-            return f"\"{self.full_name}\""
-        if self.debug_name is not None:
-            return f"Signal({self.unique_id}, \"{self.debug_name}\")"
-        return f"Signal({self.unique_id})"
+        suffix = ""
+        if self.special_name is not None:
+            suffix += f", {self.special_name}"
+        if len(self.debug_names):
+            suffix += f", debug={self.debug_names}"
+        return f"Signal({self.unique_id}{suffix})"
 
     def __repr__(self):
         return str(self)
@@ -66,7 +71,9 @@ class LogicList:
         assert signal.logic is self
 
     def new_signal(self, debug_name: Optional[str] = None) -> Signal:
-        signal = Signal(unique_id=len(self.signals), debug_name=debug_name, logic=self)
+        signal = Signal(unique_id=len(self.signals), logic=self)
+        if debug_name is not None:
+            signal.debug_names.add(debug_name)
         self.signals.append(signal)
         return signal
 
