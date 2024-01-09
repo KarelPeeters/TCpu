@@ -1,4 +1,4 @@
-from synth.flow.logic_opt import optimize_logic, combine_connections
+from synth.flow.logic_opt import optimize_logic
 from synth.flow.logic_to_net import lower_logic_to_net
 from synth.flow.net_opt import optimize_net
 from synth.flow.net_to_place import net_to_place
@@ -28,14 +28,13 @@ def main():
     curr %= curr & curr.delay()
     logic.mark_external_output(*curr.signals)
 
-    combine_connections(logic)
-    print(logic)
-
     # interface = build_cpu_serv(build)
     # for b in interface.inputs:
     #     logic.mark_external_input(b.signal)
     # for b in interface.outputs:
     #     logic.mark_external_output(b.signal)
+
+    build.finish()
 
     print("====================")
     print("Raw:")

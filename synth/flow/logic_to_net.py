@@ -23,10 +23,6 @@ def lower_logic_to_net(logic: LogicList) -> NetList:
     for ff in logic.ffs:
         __append_ff(net, signal_to_wire, output=ff.output, input=ff.input)
 
-    # connections
-    for (a, b) in logic.connections:
-        net.connect(signal_to_wire[a], signal_to_wire[b])
-
     return net
 
 

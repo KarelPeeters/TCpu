@@ -1,5 +1,5 @@
 from abc import abstractmethod, ABC
-from collections import Counter, defaultdict
+from collections import Counter
 from dataclasses import dataclass
 from typing import List, Optional, Set, Callable
 
@@ -87,10 +87,11 @@ class LogicList:
         self.signals: List[Signal] = []
         self.luts: List[LUT] = []
         self.ffs: List[FF] = []
-        self.connections: List[(Signal, Signal)] = []
 
         self.external_inputs: Set[Signal] = set()
         self.external_outputs: Set[Signal] = set()
+
+        self.builder_count = 0
 
     def check_signal(self, signal: Signal):
         assert isinstance(signal, Signal), f"Expected Signal, got {type(signal)}"
@@ -102,11 +103,6 @@ class LogicList:
             signal.debug_names.add(debug_name)
         self.signals.append(signal)
         return signal
-
-    def connect(self, a: Signal, b: Signal):
-        self.check_signal(a)
-        self.check_signal(b)
-        self.connections.append((a, b))
 
     def mark_external_input(self, *signal: Signal):
         for s in signal:
@@ -155,10 +151,6 @@ class LogicList:
                 return new
             return s
 
-        for i in range(len(self.connections)):
-            a, b = self.connections[i]
-            self.connections[i] = (replace(a), replace(b))
-
         for lut in self.luts:
             lut.replace(replace)
         for ff in self.ffs:
@@ -172,17 +164,16 @@ class LogicList:
 
         return count
 
+    def check_finished(self):
+        assert self.builder_count == 0, "There are still active builders"
+
     def validate(self, warn_unused=False, warn_undriven=False, warn_unconnected: bool = False):
+        self.check_finished()
+
+        # collect signals
         signals_driven = set(self.external_inputs)
         signals_used = set(self.external_outputs)
         signals_all = set(self.signals)
-
-        connected = defaultdict(set)
-        for s in self.signals:
-            connected[s].add(s)
-        for a, b in self.connections:
-            connected[a].add(b)
-            connected[b].add(a)
 
         for lut in self.luts:
             signals_driven.add(lut.output)
@@ -191,27 +182,30 @@ class LogicList:
             signals_driven.add(ff.output)
             signals_used.add(ff.input)
 
+        # check that signals exist
         for signal in signals_used:
             assert signal in signals_all, f"Used signal {signal} does not exist"
         for signal in signals_driven:
             assert signal in signals_all, f"Driven signal {signal} does not exist"
 
+        # check that signal ids are unique
         indices_all = set()
         for signal in signals_all:
             assert signal.unique_id not in indices_all, f"Signal {signal} has duplicate ID {signal.unique_id}"
             indices_all.add(signal.unique_id)
 
+        # check that signals are connected
         if warn_undriven:
             for signal in signals_used:
-                if all(c not in signals_driven for c in connected[signal]):
+                if signal not in signals_driven:
                     print(f"Warning: signal {signal} is used but never driven")
         if warn_unused:
             for signal in signals_driven:
-                if all(c not in signals_used for c in connected[signal]):
+                if signal not in signals_used:
                     print(f"Warning: signal {signal} is driven but never used")
         if warn_unconnected:
             for signal in signals_all:
-                if signal not in signals_driven and signal not in signals_used and len(connected[signal]) == 1:
+                if signal not in signals_driven and signal not in signals_used:
                     print(f"Warning: signal {signal} is not connected to anything")
 
     def _count_str(self) -> str:
@@ -221,7 +215,6 @@ class LogicList:
             luts_per_input_count[len(lut.inputs)] += 1
         result += f"    luts: {len(self.luts)},\n"
         result += f"    ffs: {len(self.ffs)},\n"
-        result += f"    cons: {len(self.connections)},\n"
         result += f"    luts_per_input_count: {dict(luts_per_input_count)},"
         return result
 
@@ -239,11 +232,7 @@ class LogicList:
             result += "\n"
         result += "  ],\n"
 
-        # "components"
-        result += "  connections: [\n"
-        for a, b in self.connections:
-            result += f"    {a} <-> {b}\n"
-        result += "  ],\n"
+        # components
         result += "  luts: [\n"
         for lut in self.luts:
             table_str = "".join("1" if x else "0" for x in lut.table)

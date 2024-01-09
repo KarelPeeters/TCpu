@@ -9,6 +9,17 @@ from synth.logic.logic_list import LogicList, Signal
 class LogicBuilder:
     def __init__(self, logic: LogicList):
         self.logic = logic
+        self.connections_to_make: List[(Signal, Signal)] = []
+
+        logic.builder_count += 1
+
+    def finish(self):
+        for a, b in self.connections_to_make:
+            self.logic.replace_signal(a, b)
+        self.connections_to_make.clear()
+
+        self.logic.builder_count -= 1
+        self.logic = None
 
     # construction
     def const_bit(self, value: bool) -> 'Bit':
@@ -104,7 +115,7 @@ class BuilderValue(ABC):
         assert self_ty == other_ty, f"Connection type mismatch: {self_ty} vs {other_ty}"
 
         def f(a, b):
-            self.builder.logic.connect(a, b)
+            self.builder.connections_to_make.append((a, b))
             # we have to return a dummy signal
             return a
 
