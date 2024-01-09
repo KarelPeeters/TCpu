@@ -64,6 +64,9 @@ class Lattice(Generic[T]):
         else:
             return f"Lattice.def({self.value})"
 
+    def __repr__(self):
+        return str(self)
+
 
 Lattice.OVERDEF = Lattice(is_overdef=True, value=None)
 Lattice.UNDEF = Lattice(is_overdef=False, value=None)

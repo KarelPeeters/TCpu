@@ -24,8 +24,12 @@ def main():
 
     # curr = build_counter(build, 16)
 
-    curr = build.new_bitvec(2)
-    curr %= curr & curr.delay()
+    new = build.new_bitvec(2, "new")
+    curr = build.new_bitvec(2, "curr")
+
+    curr %= (curr | new).delay()
+
+    logic.mark_external_input(*new.signals)
     logic.mark_external_output(*curr.signals)
 
     # interface = build_cpu_serv(build)
