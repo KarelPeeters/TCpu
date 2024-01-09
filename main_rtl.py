@@ -1,5 +1,4 @@
-from design.serv import build_cpu_serv
-from synth.flow.logic_opt import optimize_logic
+from synth.flow.logic_opt import optimize_logic, combine_connections
 from synth.flow.logic_to_net import lower_logic_to_net
 from synth.flow.net_opt import optimize_net
 from synth.flow.net_to_place import net_to_place
@@ -24,13 +23,19 @@ def main():
     build = LogicBuilder(logic)
 
     # curr = build_counter(build, 16)
-    # logic.mark_external_output(*curr.signals)
 
-    interface = build_cpu_serv(build)
-    for b in interface.inputs:
-        logic.mark_external_input(b.signal)
-    for b in interface.outputs:
-        logic.mark_external_output(b.signal)
+    curr = build.new_bitvec(2)
+    curr %= curr & curr.delay()
+    logic.mark_external_output(*curr.signals)
+
+    combine_connections(logic)
+    print(logic)
+
+    # interface = build_cpu_serv(build)
+    # for b in interface.inputs:
+    #     logic.mark_external_input(b.signal)
+    # for b in interface.outputs:
+    #     logic.mark_external_output(b.signal)
 
     print("====================")
     print("Raw:")
@@ -42,6 +47,8 @@ def main():
     print("====================")
     print("Logic opt:")
     optimize_logic(logic)
+
+    return
 
     logic.validate(warn_unused=True, warn_undriven=True, warn_unconnected=True)
     logic.print_counts()

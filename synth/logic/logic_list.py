@@ -1,6 +1,7 @@
+from abc import abstractmethod, ABC
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from typing import List, Optional, Set
+from typing import List, Optional, Set, Callable
 
 
 class Signal:
@@ -38,7 +39,14 @@ class Signal:
 
 
 @dataclass
-class LUT:
+class SignalUser(ABC):
+    @abstractmethod
+    def replace(self, f: Callable[[Signal], Signal]):
+        raise NotImplementedError()
+
+
+@dataclass
+class LUT(SignalUser):
     output: Signal
     # TODO document endianness of these lists (steal from the pulldown network builder)
     inputs: List[Signal]
@@ -47,12 +55,30 @@ class LUT:
     def __post_init__(self):
         assert 2 ** len(self.inputs) == len(self.table)
 
+    def replace(self, f: Callable[[Signal], Signal]):
+        self.output = f(self.output)
+        self.inputs = [f(s) for s in self.inputs]
+
+    def lines(self):
+        for i in range(len(self.table)):
+            yield [((i >> j & 1) != 0) for j in range(len(self.inputs))], self.table[i]
+
+    def __hash__(self):
+        return id(self)
+
 
 @dataclass
-class FF:
-    init: bool
-    input: Signal
+class FF(SignalUser):
     output: Signal
+    input: Signal
+    init: bool
+
+    def replace(self, f: Callable[[Signal], Signal]):
+        self.input = f(self.input)
+        self.output = f(self.output)
+
+    def __hash__(self):
+        return id(self)
 
 
 # TODO: with-based context naming scheme?
@@ -134,12 +160,9 @@ class LogicList:
             self.connections[i] = (replace(a), replace(b))
 
         for lut in self.luts:
-            lut.output = replace(lut.output)
-            lut.inputs = [replace(s) for s in lut.inputs]
-
+            lut.replace(replace)
         for ff in self.ffs:
-            ff.input = replace(ff.input)
-            ff.output = replace(ff.output)
+            ff.replace(replace)
 
         self.external_inputs = {replace(s) for s in self.external_inputs}
         self.external_outputs = {replace(s) for s in self.external_outputs}
@@ -228,7 +251,7 @@ class LogicList:
         result += "  ],\n"
         result += "  ffs: [\n"
         for ff in self.ffs:
-            result += f"    {ff.output} = FF({ff.input}, {ff.init})\n"
+            result += f"    {ff.output} = FF({ff.input}, {int(ff.init)})\n"
         result += "  ],\n"
 
         result += "  counts: [\n"
