@@ -1,5 +1,5 @@
 from abc import abstractmethod, ABC
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from typing import List, Optional, Set, Callable
 
@@ -171,15 +171,17 @@ class LogicList:
         self.check_finished()
 
         # collect signals
-        signals_driven = set(self.external_inputs)
+        signals_driven = defaultdict(lambda: set())
+        for x in self.external_inputs:
+            signals_driven[x].add(None)
         signals_used = set(self.external_outputs)
         signals_all = set(self.signals)
 
         for lut in self.luts:
-            signals_driven.add(lut.output)
+            signals_driven[lut.output].add(lut)
             signals_used.update(lut.inputs)
         for ff in self.ffs:
-            signals_driven.add(ff.output)
+            signals_driven[ff.output].add(ff)
             signals_used.add(ff.input)
 
         # check that signals exist
@@ -207,6 +209,47 @@ class LogicList:
             for signal in signals_all:
                 if signal not in signals_driven and signal not in signals_used:
                     print(f"Warning: signal {signal} is not connected to anything")
+
+        # check at most one driver per signal
+        for signal, drivers in signals_driven.items():
+            assert len(drivers) <= 1, f"Signal {signal} has multiple drivers: {drivers}"
+
+        # check for LUT loops (FF "loops" are fine)
+        loop_free_luts = set()
+        looped_luts = set()
+        curr_loop = []
+
+        def is_looped(lut: LUT) -> Optional[List[LUT]]:
+            if lut in loop_free_luts:
+                return None
+            if lut.output in curr_loop:
+                found_loop = list(reversed(curr_loop))
+                curr_loop.clear()
+                return found_loop
+
+            curr_loop.append(lut.output)
+            for lut_input in lut.inputs:
+                for driver in signals_driven[lut_input]:
+                    if isinstance(driver, LUT):
+                        found_loop = is_looped(driver)
+                        if found_loop is not None:
+                            return found_loop
+
+            curr_loop.pop()
+            loop_free_luts.add(lut)
+            return None
+
+        for lut in self.luts:
+            if lut in looped_luts or lut in loop_free_luts:
+                continue
+
+            loop = is_looped(lut)
+            if loop is not None:
+                print(f"Error: LUT loop detected: {is_looped(lut)}")
+                looped_luts.update(loop)
+
+        if len(looped_luts) > 0:
+            raise RuntimeError("LUT loop detected")
 
     def _count_str(self) -> str:
         result = ""

@@ -38,8 +38,9 @@ def main():
 
     print("====================")
     print("Raw:")
-    logic.validate(warn_unused=True, warn_undriven=True, warn_unconnected=True)
+    print(logic)
     logic.print_counts()
+    logic.validate(warn_unused=True, warn_undriven=True, warn_unconnected=True)
     net_unopt = lower_logic_to_net(logic)
     net_unopt.print_cost(COMPONENT_COST)
 
