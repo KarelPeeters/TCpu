@@ -192,6 +192,35 @@ def remove_dead(logic: LogicList) -> bool:
     return new_count < orig_count
 
 
-def deduplicate(_: LogicList) -> bool:
-    # TODO
-    return False
+def deduplicate(logic: LogicList) -> bool:
+    replaced = 0
+
+    ffs = {}
+    ffs_to_delete = set()
+
+    for ff in logic.ffs:
+        # find identical
+        key = ff.operands_tuple()
+        if key not in ffs:
+            ffs[key] = ff
+            continue
+        # replace
+        replaced += logic.replace_signal(ff.output, ffs[key].output)
+        ffs_to_delete.add(ff)
+
+    luts = {}
+    luts_to_delete = set()
+    for lut in logic.luts:
+        # find identical
+        key = lut.operands_tuple()
+        if key not in luts:
+            luts[key] = lut
+            continue
+        # replace
+        replaced += logic.replace_signal(lut.output, luts[key].output)
+        luts_to_delete.add(lut)
+
+    logic.ffs = [ff for ff in logic.ffs if ff not in ffs_to_delete]
+    logic.luts = [lut for lut in logic.luts if lut not in luts_to_delete]
+
+    return replaced > 0

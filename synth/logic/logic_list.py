@@ -76,6 +76,9 @@ class LUT(SignalUser):
     def __hash__(self):
         return id(self)
 
+    def operands_tuple(self):
+        return *self.inputs, *self.table
+
 
 @dataclass
 class FF(SignalUser):
@@ -89,6 +92,9 @@ class FF(SignalUser):
 
     def __hash__(self):
         return id(self)
+
+    def operands_tuple(self):
+        return self.input, self.init
 
 
 # TODO: with-based context naming scheme?
