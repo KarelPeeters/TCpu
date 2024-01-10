@@ -63,6 +63,16 @@ class LUT(SignalUser):
         for i in range(len(self.table)):
             yield [((i >> j & 1) != 0) for j in range(len(self.inputs))], self.table[i]
 
+    def replace_consts(self, consts: List[Optional[bool]]):
+        assert len(consts) == len(self.inputs)
+
+        new_table = []
+        for line_in, line_out in self.lines():
+            if all(c is None or c == v for c, v in zip(consts, line_in)):
+                new_table.append(line_out)
+        self.table = new_table
+        self.inputs = [s for s, c in zip(self.inputs, consts) if c is None]
+
     def __hash__(self):
         return id(self)
 

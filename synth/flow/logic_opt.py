@@ -13,6 +13,7 @@ def optimize_logic(logic: LogicList):
 
         changed |= const_propagation(logic)
         changed |= remove_dead(logic)
+        # TODO deduplicate luts and ffs
 
         if not changed:
             break
@@ -30,8 +31,8 @@ def const_propagation(logic: LogicList) -> bool:
             single_def[lut.output] = None
         else:
             single_def[lut.output] = lut
-        for c in lut.inputs:
-            users[c].add(lut)
+        for signal in lut.inputs:
+            users[signal].add(lut)
     for ff in logic.ffs:
         if ff.output in single_def:
             single_def[ff.output] = None
@@ -41,8 +42,8 @@ def const_propagation(logic: LogicList) -> bool:
 
     # initialize lattice
     lattice: Dict[Signal, Lattice[bool]] = defaultdict(lambda: Lattice.UNDEF)
-    for c in logic.external_inputs:
-        lattice[c] = Lattice.OVERDEF
+    for signal in logic.external_inputs:
+        lattice[signal] = Lattice.OVERDEF
     for ff in logic.ffs:
         lattice[ff.output] = Lattice.new_def(ff.init)
 
@@ -50,25 +51,25 @@ def const_propagation(logic: LogicList) -> bool:
     todo = set(logic.ffs + logic.luts)
 
     while todo:
-        c = todo.pop()
-        print(f"Visiting {c}")
+        component = todo.pop()
 
         # eval
-        if isinstance(c, FF):
-            signal = c.output
-            output_new = lattice[c.input]
-        elif isinstance(c, LUT):
-            signal = c.output
-            output_new = eval_lut(c, lattice)
+        if isinstance(component, FF):
+            signal = component.output
+            output_new = lattice[component.input]
+        elif isinstance(component, LUT):
+            signal = component.output
+            output_new = eval_lut(component, lattice)
         else:
-            raise TypeError(f"Unknown user type {type(c)}")
+            raise TypeError(f"Unknown user type {type(component)}")
 
         output_prev = lattice[signal]
-        derp = output_new
         output_new = output_prev.merge(output_new)
 
         if output_prev.is_overdef:
             assert output_new.is_overdef
+        if output_prev.is_def:
+            assert output_new.is_def or output_new.is_overdef
 
         if output_new != output_prev:
             lattice[signal] = output_new
@@ -78,11 +79,26 @@ def const_propagation(logic: LogicList) -> bool:
     # TODO: replace constants? or just immediately mutate users?
     # TODO what to do about undef? just pick 0? report warning?
     #   or actually cleverly pick the best value depending on the users?
-    for c, x in lattice.items():
-        if not x.is_overdef:
-            print(f"Simplifying {c} to {x}")
+    luts_updated = set()
 
-    return False
+    for signal, signal_value in lattice.items():
+        if signal_value.is_undef:
+            print(f"Warning: {signal} is undef")
+        if signal_value.is_def:
+            print(f"Found constant {signal} = {signal_value}")
+            for user in users[signal]:
+                if isinstance(user, LUT):
+                    if user in luts_updated:
+                        continue
+                    luts_updated.add(user)
+
+                    inputs = []
+                    for input in user.inputs:
+                        input_value = lattice[input]
+                        inputs.append(input_value.value if input_value.is_def else None)
+                    user.replace_consts(inputs)
+
+    return len(luts_updated) > 0
 
 
 def eval_lut(lut: LUT, lattice: Dict[Signal, Lattice[bool]]) -> Lattice[bool]:

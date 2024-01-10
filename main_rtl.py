@@ -27,7 +27,7 @@ def main():
     new = build.new_bitvec(2, "new")
     curr = build.new_bitvec(2, "curr")
 
-    curr %= (curr | new).delay()
+    curr %= (curr & new).delay()
 
     logic.mark_external_input(*new.signals)
     logic.mark_external_output(*curr.signals)
@@ -51,9 +51,6 @@ def main():
     print("====================")
     print("Logic opt:")
     optimize_logic(logic)
-
-    return
-
     logic.validate(warn_unused=True, warn_undriven=True, warn_unconnected=True)
     logic.print_counts()
     net = lower_logic_to_net(logic)
@@ -63,6 +60,8 @@ def main():
     print("Net opt:")
     optimize_net(net)
     net.print_cost(COMPONENT_COST)
+
+    return
 
     # sch = net_to_phys(net)
     # sch.to_file("ignored/output.kicad_sch")
