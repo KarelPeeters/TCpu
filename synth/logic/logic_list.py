@@ -101,6 +101,7 @@ class LogicList:
         self.external_inputs: Set[Signal] = set()
         self.external_outputs: Set[Signal] = set()
 
+        self.next_signal_id = 0
         self.builder_count = 0
 
     def check_signal(self, signal: Signal):
@@ -108,7 +109,8 @@ class LogicList:
         assert signal.logic is self
 
     def new_signal(self, debug_name: Optional[str] = None) -> Signal:
-        signal = Signal(unique_id=len(self.signals), logic=self)
+        signal = Signal(unique_id=self.next_signal_id, logic=self)
+        self.next_signal_id += 1
         if debug_name is not None:
             signal.debug_names.add(debug_name)
         self.signals.append(signal)
