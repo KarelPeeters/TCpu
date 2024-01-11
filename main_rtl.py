@@ -1,4 +1,5 @@
 from synth.flow.logic_opt import optimize_logic
+from synth.flow.logic_sim import logic_sim
 from synth.flow.logic_to_net import lower_logic_to_net
 from synth.flow.net_opt import optimize_net
 from synth.flow.net_to_place import net_to_place
@@ -62,6 +63,8 @@ def main():
     print("Net opt:")
     optimize_net(net)
     net.print_cost(COMPONENT_COST)
+
+    logic_sim(logic, 32).print()
 
     return
 

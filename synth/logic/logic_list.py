@@ -63,6 +63,14 @@ class LUT(SignalUser):
         for i in range(len(self.table)):
             yield [((i >> j & 1) != 0) for j in range(len(self.inputs))], self.table[i]
 
+    def eval(self, inputs: List[bool]) -> bool:
+        assert len(inputs) == len(self.inputs)
+        index = 0
+        for i, b in enumerate(inputs):
+            if b:
+                index |= 1 << i
+        return self.table[index]
+
     def replace_consts(self, consts: List[Optional[bool]]):
         assert len(consts) == len(self.inputs)
 
@@ -98,6 +106,8 @@ class FF(SignalUser):
 
 
 # TODO: with-based context naming scheme?
+# TODO ensure each signal is only driven by: an FF, OR a combination of IO and LUTs
+#    (that hopefully don't have any mismatches, eg. identical or high impedance)
 class LogicList:
     def __init__(self):
         self.signals: List[Signal] = []
