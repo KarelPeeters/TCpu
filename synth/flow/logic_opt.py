@@ -13,12 +13,14 @@ def optimize_logic(logic: LogicList):
         changed = False
 
         changed |= const_propagation(logic)
-        print("After const prop:")
-        print(logic)
         changed |= remove_dead(logic)
-        print("After dead removal:")
-        print(logic)
         changed |= deduplicate(logic)
+        changed |= simplify(logic)
+
+        # TODO remove buffers (LUTS with table [01])
+        # TODO fuse luts (including through FFs, we can retime later)
+        # TODO more complex expression simplification, eg. "a & a" -> "a"
+        #   consider using a SAT solver for this?
 
         if not changed:
             break
@@ -126,7 +128,6 @@ def const_propagation(logic: LogicList) -> bool:
         if signal_value.is_undef:
             print(f"Warning: {signal} is undef")
         if signal_value.is_def:
-            print(f"Replacing {signal} with {signal_value}")
             for user in use_def.users[signal]:
                 if isinstance(user, LUT):
                     if user in luts_updated:
@@ -169,7 +170,7 @@ def remove_dead(logic: LogicList) -> bool:
 
     # collect live
     live: Set[Signal] = set()
-    todo: Set[Signal] = set(logic.external_outputs)
+    todo: Set[Signal] = set(logic.external_inputs | logic.external_outputs)
 
     while todo:
         signal = todo.pop()
@@ -181,14 +182,13 @@ def remove_dead(logic: LogicList) -> bool:
             todo.update(def_inputs(d))
 
     # delete non-live
-    print(f"Live signals: {live}")
-
-    orig_count = len(logic.luts) + len(logic.ffs)
+    orig_count = len(logic.luts) + len(logic.ffs) + len(logic.signals)
 
     logic.ffs = [ff for ff in logic.ffs if ff.output in live]
     logic.luts = [lut for lut in logic.luts if lut.output in live]
+    logic.signals = [signal for signal in logic.signals if signal in live]
 
-    new_count = len(logic.luts) + len(logic.ffs)
+    new_count = len(logic.luts) + len(logic.ffs) + len(logic.signals)
     return new_count < orig_count
 
 
@@ -224,3 +224,14 @@ def deduplicate(logic: LogicList) -> bool:
     logic.luts = [lut for lut in logic.luts if lut not in luts_to_delete]
 
     return replaced > 0
+
+
+def simplify(logic: LogicList) -> bool:
+    changed = False
+
+    for lut in logic.luts:
+        if lut.table == [False, True]:
+            logic.replace_signal(lut.output, lut.inputs[0])
+            changed = True
+
+    return changed

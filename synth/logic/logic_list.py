@@ -104,6 +104,7 @@ class LogicList:
         self.luts: List[LUT] = []
         self.ffs: List[FF] = []
 
+        # TODO combine these? in/out gets fuzzy once we allow bidirectional, buffers and high impedance
         self.external_inputs: Set[Signal] = set()
         self.external_outputs: Set[Signal] = set()
 
@@ -207,6 +208,10 @@ class LogicList:
             assert signal in signals_all, f"Used signal {signal} does not exist"
         for signal in signals_driven:
             assert signal in signals_all, f"Driven signal {signal} does not exist"
+        for signal in self.external_inputs:
+            assert signal in signals_all, f"External input {signal} does not exist"
+        for signal in self.external_outputs:
+            assert signal in signals_all, f"External output {signal} does not exist"
 
         # check that signal ids are unique
         indices_all = set()
