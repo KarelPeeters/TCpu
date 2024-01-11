@@ -228,10 +228,14 @@ def deduplicate(logic: LogicList) -> bool:
 
 def simplify(logic: LogicList) -> bool:
     changed = False
+    luts_to_remove = set()
 
     for lut in logic.luts:
         if lut.table == [False, True]:
             logic.replace_signal(lut.output, lut.inputs[0])
+            luts_to_remove.add(lut)
             changed = True
+
+    logic.luts = [lut for lut in logic.luts if lut not in luts_to_remove]
 
     return changed
