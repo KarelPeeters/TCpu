@@ -57,7 +57,7 @@ class LogicBuilder:
         return self.logic.new_lut(signals, table)
 
     def gate_xor(self, signals: List[Signal]) -> Signal:
-        table = [False, True] * (2 ** len(signals) // 2)
+        table = [i.bit_count() % 2 == 1 for i in range(2 ** len(signals))]
         return self.logic.new_lut(signals, table)
 
 
