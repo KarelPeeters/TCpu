@@ -40,13 +40,16 @@ def main():
 
     build.finish()
 
+    sim_steps = 32
+
     print("====================")
     print("Raw:")
     print(logic)
     logic.validate(warn_unused=True, warn_undriven=True, warn_unconnected=True)
-    net_unopt = lower_logic_to_net(logic)
-    net_unopt.print_cost(COMPONENT_COST)
-
+    raw_sim = logic_sim(logic, sim_steps)
+    raw_sim.print()
+    raw_net = lower_logic_to_net(logic)
+    raw_net.print_cost(COMPONENT_COST)
     print("\n")
 
     print("====================")
@@ -54,24 +57,26 @@ def main():
     optimize_logic(logic)
     print(logic)
     logic.validate(warn_unused=True, warn_undriven=True, warn_unconnected=True)
-    net = lower_logic_to_net(logic)
-    net.print_cost(COMPONENT_COST)
+    opt_sim = logic_sim(logic, sim_steps)
+    opt_sim.print()
+    opt_net = lower_logic_to_net(logic)
+    opt_net.print_cost(COMPONENT_COST)
+    if raw_sim.outputs() != opt_sim.outputs():
+        print("WARNING: Raw and optimized logic sims do not match!")
 
     print("\n")
 
     print("====================")
     print("Net opt:")
-    optimize_net(net)
-    net.print_cost(COMPONENT_COST)
-
-    logic_sim(logic, 32).print()
+    optimize_net(opt_net)
+    opt_net.print_cost(COMPONENT_COST)
 
     return
 
     # sch = net_to_phys(net)
     # sch.to_file("ignored/output.kicad_sch")
 
-    net_to_place(net)
+    net_to_place(opt_net)
 
 
 if __name__ == '__main__':

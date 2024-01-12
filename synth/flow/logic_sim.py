@@ -11,26 +11,16 @@ class History:
     use_def: UseDef
     signal_history: List[Dict[Signal, Optional[bool]]]
 
-    def print(self):
+    def outputs(self):
+        return [
+            [self.signal_history[i][s] for s in self.logic.external_outputs]
+            for i in range(len(self.signal_history))
+        ]
+
+    def print(self, skip_unchanged=False):
         print("History:")
 
-        signal_names = []
-        for s in self.logic.signals:
-            suf_f, suf_l, suf_i, suf_o = "", "", "", ""
-            for d in self.use_def.defs[s]:
-                if isinstance(d, LUT):
-                    suf_l = "L"
-                elif isinstance(d, FF):
-                    suf_f = "F"
-                elif isinstance(d, ExternalInput):
-                    suf_i = "I"
-            if s in self.logic.external_outputs:
-                suf_o = "O"
-
-            name = f"{s} {suf_f}{suf_l} {suf_i}{suf_o}"
-            signal_names.append(name)
-
-        max_len = max(len(n) for n in signal_names)
+        max_len = max(len(str(s)) for s in self.logic.signals)
 
         # print the time every 8 steps
         print(" " * max_len, end="  ")
@@ -39,12 +29,28 @@ class History:
                 print(f"|{i:<7}", end="")
         print()
 
-        for n, s in zip(signal_names, self.logic.signals):
-            print(f"{n:{max_len}}: ", end="")
+        for s in self.logic.signals:
+            suf_f, suf_l, suf_i, suf_o = " ", " ", " ", " "
+            for d in self.use_def.defs[s]:
+                if isinstance(d, LUT):
+                    suf_l = "L"
+                elif isinstance(d, FF):
+                    suf_f = "F"
+                elif isinstance(d, ExternalInput):
+                    suf_i = "I"
+                if s in self.logic.external_outputs:
+                    suf_o = "O"
+
+            print(f"{str(s):{max_len}} {suf_l}{suf_f}{suf_i}{suf_o}: ", end="")
+            v_str_prev = None
             for i in range(len(self.signal_history)):
-                v = self.signal_history[i].get(s)
+                v = self.signal_history[i][s]
                 v_str = str(int(v)) if v is not None else "z"
-                print(v_str, end="")
+                if skip_unchanged and v_str == v_str_prev:
+                    print(" ", end="")
+                else:
+                    print(v_str, end="")
+                v_str_prev = v_str
             print()
 
 
@@ -53,7 +59,7 @@ def logic_sim(logic: LogicList, steps: int) -> History:
     use_def = UseDef.from_logic(logic)
 
     prev = {ff.input: ff.init for ff in logic.ffs}
-    signal_history = [prev]
+    signal_history = []
 
     def eval(state, signal: Signal):
         if signal in state:
@@ -62,7 +68,7 @@ def logic_sim(logic: LogicList, steps: int) -> History:
         results = set()
         for d in use_def.defs[signal]:
             assert isinstance(d, LUT)
-            d.eval([eval(state, x) for x in d.inputs])
+            results.add(d.eval([eval(state, x) for x in d.inputs]))
 
         # TODO proper merge, including high impedance
         if len(results) == 0:
