@@ -21,6 +21,9 @@ def optimize_logic(logic: LogicList):
         # TODO fuse luts (including through FFs, we can retime later)
         # TODO more complex expression simplification, eg. "a & a" -> "a"
         #   consider using a SAT solver for this?
+        # TODO deduplicate more complex groups of components,
+        #   eg. a LUT and a FF connected to the same input and with the same external input
+        #   (we can re-duplicate later during synthesis if needed)
 
         if not changed:
             break
