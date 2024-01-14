@@ -2,6 +2,7 @@ from synth.flow.logic_opt import optimize_logic
 from synth.flow.logic_sim import logic_sim
 from synth.flow.logic_to_net import lower_logic_to_net
 from synth.flow.net_opt import optimize_net
+from synth.flow.net_to_phys import grid_to_phys
 from synth.flow.net_to_place import net_to_place
 from synth.logic.builder import LogicBuilder, Unsigned
 from synth.logic.logic_list import LogicList
@@ -74,7 +75,10 @@ def main():
     # sch = net_to_phys(net)
     # sch.to_file("ignored/output.kicad_sch")
 
-    net_to_place(opt_net)
+    print("====================")
+    print("Place:")
+    grid = net_to_place(opt_net)
+    grid_to_phys(opt_net, grid).to_file(r"../OutputProject/OutputProject.kicad_sch")
 
 
 if __name__ == '__main__':

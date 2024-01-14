@@ -324,9 +324,9 @@ def net_to_place(net: NetList):
     success_count = 0
 
     start = time.perf_counter()
-    delta_iters = 100_000
+    delta_iters = 10_000
 
-    for i in range(20_000_000):
+    for i in range(10_000):
         success = grid.opt_step(temp=0)
         cost.append(grid.curr_cost)
         time_taken.append(time.perf_counter() - start)
@@ -368,4 +368,7 @@ def net_to_place(net: NetList):
     grid.plot()
     plt.title("After")
     plt.savefig("ignored/anneal/after.png")
-    plt.show()
+    plt.close()
+    # plt.show()
+
+    return grid
