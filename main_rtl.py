@@ -3,7 +3,7 @@ from synth.flow.logic_sim import logic_sim
 from synth.flow.logic_to_net import lower_logic_to_net
 from synth.flow.net_opt import optimize_net
 from synth.flow.net_to_place import net_to_place
-from synth.logic.builder import LogicBuilder, Unsigned, Bit
+from synth.logic.builder import LogicBuilder, Unsigned
 from synth.logic.logic_list import LogicList
 
 COMPONENT_COST = {
@@ -70,8 +70,6 @@ def main():
     print("Net opt:")
     optimize_net(opt_net)
     opt_net.print_cost(COMPONENT_COST)
-
-    return
 
     # sch = net_to_phys(net)
     # sch.to_file("ignored/output.kicad_sch")

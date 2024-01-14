@@ -70,19 +70,19 @@ class Grid:
             x, y = self.grid_index_to_xy(gi)
             ax.add_patch(plt.Rectangle((x + .2, y + .2), .6, .6, color="blue"))
 
-        max_group_cost = 0
+        max_tree_len = 0
         for wi, cs in enumerate(self.wire_index_to_component_indices):
             if len(cs) == 0:
                 continue
-            cost, _ = self.min_spanning_tree_cost(wi)
-            max_group_cost = max(max_group_cost, cost / len(cs))
+            tree_len, _ = self.wire_min_spanning_tree(wi)
+            max_tree_len = max(max_tree_len, tree_len / len(cs))
 
         for wi, cs in enumerate(self.wire_index_to_component_indices):
-            cost, edges = self.min_spanning_tree_cost(wi)
+            tree_len, edges = self.wire_min_spanning_tree(wi)
             for ci0, ci1 in edges:
                 x0, y0 = self.grid_index_to_xy(self.component_to_grid_pos[ci0])
                 x1, y1 = self.grid_index_to_xy(self.component_to_grid_pos[ci1])
-                c = (cost / len(cs)) / max_group_cost
+                c = (tree_len / len(cs)) / max_tree_len
                 ax.plot([x0 + .5, x1 + .5], [y0 + .5, y1 + .5], color=(c, 1 - c, 0))
 
         ax.set_xlim(0, self.grid_size)
@@ -106,7 +106,7 @@ class Grid:
         new_cost = self.curr_cost
         affected_wires_cost = []
         for wi in affected_wires:
-            cost, _ = self.min_spanning_tree_cost(wi)
+            cost = self.wire_cost(wi)
             affected_wires_cost.append(cost)
             new_cost += cost - self.wire_index_to_cost[wi]
 
@@ -170,12 +170,36 @@ class Grid:
         wire_index_to_cost = np.zeros(len(self.wire_to_index), dtype=int)
 
         for wi in range(len(self.wire_to_index)):
-            cost, _ = self.min_spanning_tree_cost(wi)
+            cost = self.wire_cost(wi)
             wire_index_to_cost[wi] = cost
 
         return wire_index_to_cost
 
-    def min_spanning_tree_cost(self, wi: int) -> Tuple[int, List[Tuple[int, int]]]:
+    def wire_cost(self, wi: int) -> int:
+        return self.wire_half_perimeter_cost(wi)
+
+    def wire_half_perimeter_cost(self, wi: int) -> int:
+        cis = self.wire_index_to_component_indices[wi]
+        if len(cis) <= 1:
+            return 0
+
+        min_x = np.inf
+        min_y = np.inf
+        max_x = -np.inf
+        max_y = -np.inf
+
+        for ci in cis:
+            x, y = self.grid_index_to_xy(self.component_to_grid_pos[ci])
+            min_x = min(min_x, x)
+            min_y = min(min_y, y)
+            max_x = max(max_x, x)
+            max_y = max(max_y, y)
+
+        return (max_x - min_x) + (max_y - min_y)
+
+    def wire_min_spanning_tree(self, wi: int) -> Tuple[int, List[Tuple[int, int]]]:
+        """ returns (cost, edges)"""
+
         todo = self.wire_index_to_component_indices[wi]
         if len(todo) <= 1:
             return 0, []
