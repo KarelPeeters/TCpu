@@ -24,6 +24,7 @@ def optimize_logic(logic: LogicList):
         # TODO deduplicate more complex groups of components,
         #   eg. a LUT and a FF connected to the same input and with the same external input
         #   (we can re-duplicate later during synthesis if needed)
+        #   also allow groups including cycles!
 
         if not changed:
             break

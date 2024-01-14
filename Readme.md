@@ -4,7 +4,10 @@
     * SI2302: €0.0062, SOT-23, https://jlcpcb.com/partdetail/Jsmsemi-SI2302/C5296725
     * JSM2301S: €0.0063, SOT-23, https://jlcpcb.com/partdetail/Jsmsemi-JSM2301S/C916399
     * 2N7002: €0.0074, SOT-23, https://jlcpcb.com/partdetail/Jsmsemi-2N7002/C916396
-    * smaller package: SOT-323 == SC-70, SOT-563, sadly more expensive
+    * smaller packages: (sadly more expensive?)
+      * SOT-323 == SC-70, SOT-563
+      * VML0806 (€0.0556)
+      * DFN0603
 * Resistor: 1k(?), footprint 0402 (smallest)
     * €0.0005, https://jlcpcb.com/parts/basic_parts
 * LED

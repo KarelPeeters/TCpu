@@ -23,12 +23,13 @@ class History:
         max_len = max(len(str(s)) for s in self.logic.signals)
 
         # print the time every 8 steps
-        print(" " * max_len, end="  ")
+        print(" " * (max_len + 5), end="  ")
         for i in range(len(self.signal_history)):
             if i % 8 == 0:
                 print(f"|{i:<7}", end="")
         print()
 
+        # TODO debug names as separate column
         for s in self.logic.signals:
             suf_f, suf_l, suf_i, suf_o = " ", " ", " ", " "
             for d in self.use_def.defs[s]:
@@ -73,9 +74,11 @@ def logic_sim(logic: LogicList, steps: int) -> History:
         # TODO proper merge, including high impedance
         if len(results) == 0:
             return None
-
         assert len(results) == 1, f"Multiple results for {signal}: {results}"
-        return results.pop()
+
+        result = results.pop()
+        state[signal] = result
+        return result
 
     for i in range(steps):
         curr = {}

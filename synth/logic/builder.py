@@ -11,6 +11,9 @@ class LogicBuilder:
         self.logic = logic
         self.connections_to_make: List[(Signal, Signal)] = []
 
+        self.const_zero = Bit(self, self.logic.new_lut([], [False]))
+        self.const_one = Bit(self, self.logic.new_lut([], [True]))
+
         logic.builder_count += 1
 
     def finish(self):
@@ -23,12 +26,14 @@ class LogicBuilder:
 
     # construction
     def const_bit(self, value: bool) -> 'Bit':
-        signal = self.logic.new_lut([], [value])
-        return Bit(self, signal)
+        if value:
+            return self.const_one
+        else:
+            return self.const_zero
 
     def const_unsigned(self, bits: int, value: int) -> 'Unsigned':
         assert 0 <= value < 2 ** bits
-        bits = [self.const_bit(value >> i != 0) for i in range(bits)]
+        bits = [self.const_bit(value & (1 << i) != 0) for i in range(bits)]
         return Unsigned(self, BitVec.from_bits(self, bits))
 
     def new_bit(self, name: Optional[str]) -> 'Bit':
@@ -53,7 +58,7 @@ class LogicBuilder:
         return self.logic.new_lut(signals, table)
 
     def gate_or(self, signals: List[Signal]) -> Signal:
-        table = [True] * (2 ** len(signals) - 1) + [False]
+        table = [False] + [True] * (2 ** len(signals) - 1)
         return self.logic.new_lut(signals, table)
 
     def gate_xor(self, signals: List[Signal]) -> Signal:
@@ -223,6 +228,10 @@ class BitVec(BuilderValue):
     def broadcast(bit: Bit, n: int):
         return BitVec(bit.builder, [bit.signal] * n)
 
+    @property
+    def bits(self) -> List[Bit]:
+        return [Bit(self.builder, s) for s in self.signals]
+
     def __len__(self):
         return len(self.signals)
 
@@ -290,6 +299,10 @@ class Unsigned(BuilderValue):
     @property
     def signals(self) -> List[Signal]:
         return self.vec.signals
+
+    @property
+    def bits(self) -> List[Bit]:
+        return self.vec.bits
 
     def __len__(self):
         return len(self.vec)

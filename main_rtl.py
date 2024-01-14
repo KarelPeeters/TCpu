@@ -3,7 +3,7 @@ from synth.flow.logic_sim import logic_sim
 from synth.flow.logic_to_net import lower_logic_to_net
 from synth.flow.net_opt import optimize_net
 from synth.flow.net_to_place import net_to_place
-from synth.logic.builder import LogicBuilder, Unsigned
+from synth.logic.builder import LogicBuilder, Unsigned, Bit
 from synth.logic.logic_list import LogicList
 
 COMPONENT_COST = {
@@ -14,7 +14,7 @@ COMPONENT_COST = {
 
 
 def build_counter(build: LogicBuilder, bits: int) -> Unsigned:
-    curr = build.new_unsigned(bits)
+    curr = build.new_unsigned(bits, "curr")
     curr %= curr.add_trunc(1).delay()
     return curr
 
