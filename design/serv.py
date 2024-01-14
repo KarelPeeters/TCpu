@@ -84,4 +84,4 @@ def build_alu(
     o_rd %= i_buf | (i_rd_sel[0] & result_add) | (i_rd_sel[1] & result_slt) | (i_rd_sel[2] & result_bool)
 
     add_cy_r %= i_en.mux(i_sub, add_cy).delay()
-    cmp_r %= i_en.mux(cmp_r, o_cmp)
+    cmp_r %= i_en.mux(cmp_r, o_cmp).delay()
