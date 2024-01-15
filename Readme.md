@@ -74,3 +74,28 @@ Place & Route algorithms:
 * VGA out? audio out?
 * GPIO pins?
 * Leds?
+
+# Simulation
+
+* logic level with custom waveform
+  * TODO: show initial values, maybe offset the rest? think about how to offset LUTS and FFs in time, maybe stagger?
+* net level with spice
+    * caps, resistors, proper transistor models for timing analysis
+* how to handle/express/constrain timing requirements?
+
+# Transistor level design
+
+* resistor size? should we use difference ones depending on the situation?
+* do we worry about buffers/fanout/stray capacitance?
+* add async reset to FF
+* global nets:
+    * signals:
+      * vdd, gnd
+      * reset (or reset_pull)
+      * clk (or clk_pull and (~clk)_pull)
+    * layout:
+      * plane for each? that's a lot of planes!
+      * all on single shared plane, striped
+      * all on 2 shared planes, striped/crossed?
+    * make sure to add caps for gnd and vdd
+    * make sure to add good clk tree
