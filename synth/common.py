@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, TypeVar, Generic, Optional
+from typing import List, TypeVar, Generic, Optional, Callable
 
 
 class Table:
@@ -16,6 +16,12 @@ T = TypeVar("T")
 class OptionalInvPair(Generic[T]):
     val: T
     inv: Optional[T]
+
+    def require(self, f: Callable[[T], T]) -> 'InvPair':
+        if self.inv is None:
+            return InvPair(self.val, f(self.val))
+        else:
+            return InvPair(self.val, self.inv)
 
 
 @dataclass

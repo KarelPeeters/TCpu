@@ -108,30 +108,56 @@ def gate_xor(netlist: NetList, *inputs: Wire) -> Wire:
     raise NotImplementedError("TODO")
 
 
-def new_latch_partial(netlist: NetList, clk_pull: Wire, d: OptionalInvPair[Wire]) -> InvPair[Wire]:
-    d_val = d.val
-    d_inv = d.inv if d.inv is not None else gate_not(netlist, d.val)
+# TODO add async reset
+# TODO add SR/JK/... variants? SR is particular is pretty easy
+# TODO add simulation assert that set and reset can never be high at the same time
+def new_pull_latch_sr(netlist: NetList, pull: Wire, set: Wire, reset: Wire) -> InvPair[Wire]:
+    """
+    A set/reset latch.
+    Active when pull is low, inactive when pull is Z.
+    Set and reset are not allowed to be high at the same time.
+    """
+
+    q_val = netlist.new_wire()
+    q_inv = netlist.new_wire()
 
     # inverters
-    q_inv = gate_not(netlist, d_val)
-    q_val = gate_not(netlist, d_inv)
+    netlist.push_component(Resistor(netlist.vdd, q_inv))
+    netlist.push_component(Resistor(netlist.vdd, q_val))
+    netlist.push_component(NMOS(gate=q_val, up=q_inv, down=netlist.gnd))
+    netlist.push_component(NMOS(gate=q_inv, up=q_val, down=netlist.gnd))
 
     # writers
-    netlist.push_component(NMOS(gate=d_val, up=q_inv, down=clk_pull))
-    netlist.push_component(NMOS(gate=d_inv, up=q_val, down=clk_pull))
+    netlist.push_component(NMOS(gate=set, up=q_inv, down=pull))
+    netlist.push_component(NMOS(gate=reset, up=q_val, down=pull))
 
     return InvPair(val=q_val, inv=q_inv)
 
 
-def new_latch(netlist: NetList, clk: Wire, d: OptionalInvPair[Wire]) -> InvPair[Wire]:
-    pull = netlist.new_wire()
-    netlist.push_component(NMOS(gate=clk, up=pull, down=netlist.gnd))
-    return new_latch_partial(netlist, pull, d)
+def new_pull_latch(netlist: NetList, pull: Wire, d: OptionalInvPair[Wire]) -> InvPair[Wire]:
+    """
+    A D latch.
+    Active when pull is low, inactive when pull is Z.
+    """
+    d = d.require(lambda d_val: gate_not(netlist, d_val))
+    return new_pull_latch_sr(netlist, pull, d.val, d.inv)
 
 
 def new_ff(netlist: NetList, clk: Wire, d: OptionalInvPair[Wire]) -> InvPair[Wire]:
+    """
+    A D flip-flop.
+    """
     # TODO share clock inversion between FFs
+    # TODO share pull networks between FFs?
+    # TODO do clk and clk_inv need to be synchronized? more generally, what are the timing requirements?
     clk_inv = gate_not(netlist, clk)
-    m = new_latch_partial(netlist, clk, d)
-    q = new_latch_partial(netlist, clk_inv, m)
+
+    # pull transistors
+    pull = netlist.new_wire()
+    pull_inv = netlist.new_wire()
+    netlist.push_component(NMOS(gate=clk, up=pull, down=netlist.gnd))
+    netlist.push_component(NMOS(gate=clk_inv, up=pull_inv, down=netlist.gnd))
+
+    m = new_pull_latch(netlist, pull=pull, d=d)
+    q = new_pull_latch(netlist, pull=pull_inv, d=m)
     return q
