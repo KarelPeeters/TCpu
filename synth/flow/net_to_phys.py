@@ -8,7 +8,7 @@ from kiutils.items.schitems import SchematicSymbol, SymbolProjectInstance, Symbo
 from kiutils.schematic import Schematic
 from kiutils.symbol import Symbol
 
-from synth.flow.net_to_place import Grid, GRID_EMPTY
+from synth.flow.net_to_grid import Grid, GRID_EMPTY
 from synth.net.components import NMOS, Resistor, Bridge
 from synth.net.net_list import NetList, Wire, Component
 
