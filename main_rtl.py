@@ -19,8 +19,16 @@ def main():
     logic = LogicList()
     build = LogicBuilder(logic)
 
-    curr = build_counter(build, 4)
-    logic.mark_external_output(*curr.signals)
+    # curr = build_counter(build, 4)
+
+    input = build.new_unsigned(3, "input")
+    shamt = build.new_unsigned(2, "shamt")
+    output = input << shamt
+    output_named = build.new_unsigned(len(input), "output")
+    output_named %= output
+
+    build.mark_external_input(input, shamt)
+    build.mark_external_output(output)
 
     # new = build.new_bitvec(2, "new")
     # curr = build.new_bitvec(2, "curr")

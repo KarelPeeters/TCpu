@@ -1,3 +1,4 @@
+import random
 from dataclasses import dataclass
 from typing import List, Dict, Optional
 
@@ -84,7 +85,7 @@ def logic_sim(logic: LogicList, steps: int) -> History:
         curr = {}
         for x in logic.external_inputs:
             # TODO allow user-configurable inputs
-            curr[x] = False
+            curr[x] = bool(random.randint(0, 1))
         for ff in logic.ffs:
             curr[ff.output] = prev[ff.input]
         for lut in logic.luts:

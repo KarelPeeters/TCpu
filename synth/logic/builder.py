@@ -26,6 +26,7 @@ class LogicBuilder:
 
     # construction
     def const_bit(self, value: bool) -> 'Bit':
+        assert isinstance(value, bool)
         if value:
             return self.const_one
         else:
@@ -48,6 +49,15 @@ class LogicBuilder:
 
     def new_unsigned(self, n: int, debug_name: Optional[str] = None) -> 'Unsigned':
         return Unsigned(self, self.new_bitvec(n, debug_name))
+
+    # io marking
+    def mark_external_input(self, *value: 'BuilderValue'):
+        for v in value:
+            self.logic.mark_external_input(*v.all_signals())
+
+    def mark_external_output(self, *value: 'BuilderValue'):
+        for v in value:
+            self.logic.mark_external_output(*v.all_signals())
 
     # basic gates
     def gate_not(self, signal: Signal) -> Signal:
@@ -77,16 +87,16 @@ class BuilderValue(ABC):
     def map(self, other: Self, f: Callable[[Signal, Signal], Signal]) -> Self:
         raise NotImplementedError()
 
+    @abstractmethod
+    def type_name(self) -> str:
+        raise NotImplementedError()
+
     def map_single(self, f: Callable[[Signal], Signal]) -> Self:
         def wrap(a, b):
             assert b is a
             return f(a)
 
         return self.map(self, wrap)
-
-    @abstractmethod
-    def type_name(self) -> str:
-        raise NotImplementedError()
 
     def delay(self, n: int = 1) -> Self:
         """
@@ -104,6 +114,20 @@ class BuilderValue(ABC):
             )
 
         return self.map_single(f)
+
+    def all_signals(self) -> List[Signal]:
+        """
+        Get all signals contained in this value.
+        """
+        signals = []
+
+        def visit(s):
+            signals.append(s)
+            return s
+
+        _ = self.map_single(visit)
+
+        return signals
 
     def __imod__(self, other):
         """
@@ -167,7 +191,7 @@ class Bit(BuilderValue):
     def neq(self, other: Self) -> Self:
         return Bit(self.builder, self.builder.gate_xor([self.signal, other.signal]))
 
-    def mux(self, value_0: V, value_1: V) -> Self:
+    def mux(self, value_0: V, value_1: V) -> V:
         inv = ~self
 
         def f(signal_0, signal_1):
@@ -235,6 +259,9 @@ class BitVec(BuilderValue):
     def __len__(self):
         return len(self.signals)
 
+    def __iter__(self):
+        return iter(self.bits)
+
     @overload
     def __getitem__(self, item: int) -> Bit:
         ...
@@ -278,49 +305,80 @@ class BitVec(BuilderValue):
 
 @dataclass
 class Unsigned(BuilderValue):
-    vec: BitVec
+    bits: BitVec
 
     def __post_init__(self):
-        assert isinstance(self.vec, BitVec), f"Expected BitVec, got {type(self.vec)}"
+        assert isinstance(self.bits, BitVec), f"Expected BitVec, got {type(self.bits)}"
 
     def __repr__(self):
-        return f"Unsigned({self.vec.signals})"
+        return f"Unsigned({self.bits.signals})"
 
     def map(self, other: Optional[Self], f: Callable[[Signal, Optional[Signal]], Signal]) -> Self:
         assert isinstance(other, Unsigned), f"Type mismatch: expected Unsigned, got {type(other)}"
-        return Unsigned(self.builder, self.vec.map(other.vec, f))
+        return Unsigned(self.builder, self.bits.map(other.bits, f))
 
     def type_name(self) -> str:
         return f"unsigned[{len(self)}]"
 
     def as_vec(self) -> BitVec:
-        return self.vec
-
-    @property
-    def signals(self) -> List[Signal]:
-        return self.vec.signals
-
-    @property
-    def bits(self) -> List[Bit]:
-        return self.vec.bits
+        return self.bits
 
     def __len__(self):
-        return len(self.vec)
+        return len(self.bits)
 
     def __invert__(self) -> Self:
-        return Unsigned(self.builder, self.vec.__invert__())
+        return Unsigned(self.builder, self.bits.__invert__())
 
     def __and__(self, other: Self) -> Self:
         assert self.builder is other.builder
-        return Unsigned(self.builder, self.vec.__and__(other.vec))
+        return Unsigned(self.builder, self.bits.__and__(other.bits))
 
     def __or__(self, other: Self) -> Self:
         assert self.builder is other.builder
-        return Unsigned(self.builder, self.vec.__or__(other.vec))
+        return Unsigned(self.builder, self.bits.__or__(other.bits))
 
     def __xor__(self, other: Self) -> Self:
         assert self.builder is other.builder
-        return Unsigned(self.builder, self.vec.__xor__(other.vec))
+        return Unsigned(self.builder, self.bits.__xor__(other.bits))
+
+    def shift(self, amount: Union[Self, int], right: bool, pad: Bit) -> Self:
+        def get_padded(x, i):
+            if 0 <= i < len(x):
+                return x[i]
+            return pad
+        dir_sign = 1 if right else -1
+
+        if isinstance(amount, int):
+            # TODO allow negative shifts?
+            assert amount >= 0
+            result = []
+            # TODO try just converting this to bits and letting the optimizer deal with it
+            for i_out in range(len(self)):
+                i_in = i_out + dir_sign * amount
+                result.append(get_padded(self.bits, i_in))
+            return Unsigned(self.builder, BitVec.from_bits(self.builder, result))
+
+        assert isinstance(amount, Unsigned)
+        assert self.builder is amount.builder
+
+        # generate barrel shifter
+        curr = self.bits.bits
+        for i_amount, select in enumerate(amount.bits):
+            curr = [
+                select.mux(curr[i_curr], get_padded(curr, i_curr + dir_sign * (1 << i_amount)))
+                for i_curr in range(len(self))
+            ]
+        return BitVec.from_bits(self.builder, curr).as_unsigned()
+
+    def __rshift__(self, amount: Union[Self, int]) -> Self:
+        assert isinstance(amount, Unsigned)
+        assert self.builder is amount.builder
+        return self.shift(amount=amount, right=True, pad=(self.builder.const_bit(False)))
+
+    def __lshift__(self, amount: Union[Self, int]) -> Self:
+        assert isinstance(amount, Unsigned)
+        assert self.builder is amount.builder
+        return self.shift(amount=amount, right=False, pad=(self.builder.const_bit(False)))
 
     def add_full(self, other: Union[Self, int], cin: Optional[Bit]) -> Self:
         if isinstance(other, int):
@@ -335,7 +393,7 @@ class Unsigned(BuilderValue):
         result = []
 
         for i in range(len(self)):
-            carry, result_i = Bit.full_add(self.vec[i], other.vec[i], carry)
+            carry, result_i = Bit.full_add(self.bits[i], other.bits[i], carry)
             result.append(result_i)
 
         result.append(carry)
