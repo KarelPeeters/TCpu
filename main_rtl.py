@@ -1,10 +1,11 @@
+from design.tiny import build_counter
+from synth.flow.grid_to_sch import grid_to_phys
 from synth.flow.logic_opt import optimize_logic
 from synth.flow.logic_sim import logic_sim
 from synth.flow.logic_to_net import lower_logic_to_net
 from synth.flow.net_opt import optimize_net
-from synth.flow.grid_to_sch import grid_to_phys
 from synth.flow.net_to_grid import net_to_place
-from synth.logic.builder import LogicBuilder, Unsigned
+from synth.logic.builder import LogicBuilder
 from synth.logic.logic_list import LogicList
 
 COMPONENT_COST = {
@@ -12,12 +13,6 @@ COMPONENT_COST = {
     "NMos": 0.0062 * 2,
     "Resistor": 0.0005 * 2,
 }
-
-
-def build_counter(build: LogicBuilder, bits: int) -> Unsigned:
-    curr = build.new_unsigned(bits, "curr")
-    curr %= curr.add_trunc(1).delay()
-    return curr
 
 
 def main():
